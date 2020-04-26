@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <OpenEXR/half.h>
+#include <half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/paramlist.h>

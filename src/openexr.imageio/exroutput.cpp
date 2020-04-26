@@ -10,13 +10,12 @@
 #include <iostream>
 #include <map>
 #include <memory>
-
 #include <OpenImageIO/platform.h>
 
-#include <OpenEXR/ImfChannelList.h>
-#include <OpenEXR/ImfEnvmap.h>
-#include <OpenEXR/ImfOutputFile.h>
-#include <OpenEXR/ImfTiledOutputFile.h>
+#include <OpenEXR/IlmImf/ImfChannelList.h>
+#include <OpenEXR/IlmImf/ImfEnvmap.h>
+#include <OpenEXR/IlmImf/ImfOutputFile.h>
+#include <OpenEXR/IlmImf/ImfTiledOutputFile.h>
 
 #ifdef OPENEXR_VERSION_MAJOR
 #    define OPENEXR_CODED_VERSION                                              \
@@ -38,32 +37,32 @@
 OIIO_PRAGMA_VISIBILITY_PUSH
 OIIO_PRAGMA_WARNING_PUSH
 OIIO_GCC_PRAGMA(GCC diagnostic ignored "-Wunused-parameter")
-#include <OpenEXR/IexBaseExc.h>
-#include <OpenEXR/ImfBoxAttribute.h>
-#include <OpenEXR/ImfCRgbaFile.h>  // JUST to get symbols to figure out version!
-#include <OpenEXR/ImfChromaticitiesAttribute.h>
-#include <OpenEXR/ImfCompressionAttribute.h>
-#include <OpenEXR/ImfEnvmapAttribute.h>
-#include <OpenEXR/ImfFloatAttribute.h>
+#include <IlmBase/Iex/IexBaseExc.h>
+#include <OpenEXR/IlmImf/ImfBoxAttribute.h>
+#include <OpenEXR/IlmImf/ImfCRgbaFile.h>  // JUST to get symbols to figure out version!
+#include <OpenEXR/IlmImf/ImfChromaticitiesAttribute.h>
+#include <OpenEXR/IlmImf/ImfCompressionAttribute.h>
+#include <OpenEXR/IlmImf/ImfEnvmapAttribute.h>
+#include <OpenEXR/IlmImf/ImfFloatAttribute.h>
 #if OPENEXR_HAS_FLOATVECTOR
-#    include <OpenEXR/ImfFloatVectorAttribute.h>
+#    include <OpenEXR/IlmImf/ImfFloatVectorAttribute.h>
 #endif
-#include <OpenEXR/ImfIntAttribute.h>
-#include <OpenEXR/ImfKeyCodeAttribute.h>
-#include <OpenEXR/ImfMatrixAttribute.h>
-#include <OpenEXR/ImfRationalAttribute.h>
-#include <OpenEXR/ImfStringAttribute.h>
-#include <OpenEXR/ImfTimeCodeAttribute.h>
-#include <OpenEXR/ImfVecAttribute.h>
+#include <OpenEXR/IlmImf/ImfIntAttribute.h>
+#include <OpenEXR/IlmImf/ImfKeyCodeAttribute.h>
+#include <OpenEXR/IlmImf/ImfMatrixAttribute.h>
+#include <OpenEXR/IlmImf/ImfRationalAttribute.h>
+#include <OpenEXR/IlmImf/ImfStringAttribute.h>
+#include <OpenEXR/IlmImf/ImfTimeCodeAttribute.h>
+#include <OpenEXR/IlmImf/ImfVecAttribute.h>
 
-#include <OpenEXR/ImfDeepScanLineOutputPart.h>
-#include <OpenEXR/ImfDeepTiledOutputPart.h>
-#include <OpenEXR/ImfDoubleAttribute.h>
-#include <OpenEXR/ImfMultiPartOutputFile.h>
-#include <OpenEXR/ImfOutputPart.h>
-#include <OpenEXR/ImfPartType.h>
-#include <OpenEXR/ImfStringVectorAttribute.h>
-#include <OpenEXR/ImfTiledOutputPart.h>
+#include <OpenEXR/IlmImf/ImfDeepScanLineOutputPart.h>
+#include <OpenEXR/IlmImf/ImfDeepTiledOutputPart.h>
+#include <OpenEXR/IlmImf/ImfDoubleAttribute.h>
+#include <OpenEXR/IlmImf/ImfMultiPartOutputFile.h>
+#include <OpenEXR/IlmImf/ImfOutputPart.h>
+#include <OpenEXR/IlmImf/ImfPartType.h>
+#include <OpenEXR/IlmImf/ImfStringVectorAttribute.h>
+#include <OpenEXR/IlmImf/ImfTiledOutputPart.h>
 OIIO_PRAGMA_WARNING_POP
 OIIO_PRAGMA_VISIBILITY_POP
 

@@ -7,7 +7,7 @@
 /// or channels between images without altering their values.
 
 
-#include <OpenEXR/half.h>
+#include <IlmBase/Half/half.h>
 
 #include <cmath>
 #include <iostream>

@@ -5,8 +5,8 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <OpenEXR/ImathFun.h>
-#include <OpenEXR/half.h>
+#include <ImathFun.h>
+#include <half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/fmath.h>

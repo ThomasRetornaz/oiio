@@ -9,7 +9,7 @@
 
 #include <boost/container/flat_map.hpp>
 
-#include <OpenEXR/half.h>
+#include <half.h>
 
 #include <OpenImageIO/color.h>
 #include <OpenImageIO/imagebufalgo.h>

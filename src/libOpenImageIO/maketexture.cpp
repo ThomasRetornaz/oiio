@@ -11,8 +11,8 @@
 #include <memory>
 #include <sstream>
 
-#include <OpenEXR/ImathMatrix.h>
-#include <OpenEXR/half.h>
+#include <ImathMatrix.h>
+#include <half.h>
 
 #include <OpenImageIO/argparse.h>
 #include <OpenImageIO/dassert.h>

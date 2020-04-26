@@ -28,8 +28,10 @@
 #include <algorithm>
 #include <cstring>
 
-#include <OpenEXR/ImathVec.h>
-#include <OpenEXR/ImathMatrix.h>
+//#include <OpenEXR/ImathVec.h>
+#include <IlmBase/Imath/ImathVec.h>
+//#include <OpenEXR/ImathMatrix.h>
+#include <IlmBase/Imath/ImathMatrix.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/platform.h>

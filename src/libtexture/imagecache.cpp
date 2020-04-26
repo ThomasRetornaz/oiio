@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <OpenEXR/ImathMatrix.h>
+#include <ImathMatrix.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/filesystem.h>

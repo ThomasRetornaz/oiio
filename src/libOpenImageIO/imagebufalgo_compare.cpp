@@ -5,8 +5,7 @@
 /// \file
 /// Implementation of ImageBufAlgo algorithms that analize or compare
 /// images.
-
-#include <OpenEXR/half.h>
+#include <IlmBase/Half/half.h>
 
 #include <cmath>
 #include <iostream>

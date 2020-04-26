@@ -6,8 +6,8 @@
 #include <iostream>
 #include <memory>
 
-#include <OpenEXR/ImathFun.h>
-#include <OpenEXR/half.h>
+#include <IlmBase/Imath/ImathFun.h>
+#include <IlmBase/Half/half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/deepdata.h>

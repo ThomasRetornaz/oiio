@@ -21,7 +21,7 @@
 #include <OpenImageIO/parallel.h>
 #include <OpenImageIO/span.h>
 
-#include <OpenEXR/ImathMatrix.h>       /* because we need M33f */
+#include <IlmBase/Imath/ImathMatrix.h>       /* because we need M33f */
 
 #include <limits>
 

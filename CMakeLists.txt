@@ -60,14 +60,14 @@ endif ()
 
 
 option (VERBOSE "Print lots of messages while compiling" OFF)
-option (${PROJ_NAME}_BUILD_TOOLS "Build the command-line tools" ON)
-option (${PROJ_NAME}_BUILD_TESTS "Build the unit tests" ON)
+option (${PROJ_NAME}_BUILD_TOOLS "Build the command-line tools" OFF)
+option (${PROJ_NAME}_BUILD_TESTS "Build the unit tests" OFF)
 set (OIIO_LIBNAME_SUFFIX "" CACHE STRING
      "Optional name appended to ${PROJECT_NAME} libraries that are built")
 option (BUILD_OIIOUTIL_ONLY "If ON, will build *only* libOpenImageIO_Util" OFF)
-option (BUILD_DOCS "If ON, build documentation and man pages." ON)
-option (INSTALL_DOCS "If ON, install documentation and man pages." ON)
-option (INSTALL_FONTS "If ON, install default fonts" ON)
+option (BUILD_DOCS "If ON, build documentation and man pages." OFF)
+option (INSTALL_DOCS "If ON, install documentation and man pages." OFF)
+option (INSTALL_FONTS "If ON, install default fonts" OFF)
 option (INSTALL_CMAKE_HELPER "If On, install FindOpenImageIO.cmake" ON)
 option (EMBEDPLUGINS "Embed format plugins in libOpenImageIO" ON)
 set (PLUGIN_SEARCH_PATH "" CACHE STRING "Default plugin search path")
@@ -212,6 +212,8 @@ IF ( NOT MSVC )
             COMPONENT developer)
 ENDIF()
 
+if(OIIO_INSTALL)
+
 # Oddball: install the FindOpenImageIO.cmake file
 install (FILES src/cmake/modules/FindOpenImageIO.cmake
          DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/Modules
@@ -256,6 +258,7 @@ install (EXPORT OIIO_EXPORTED_TARGETS
         FILE ${OIIO_TARGETS_EXPORT_NAME}
         NAMESPACE ${PROJECT_NAME}::)
 
+endif()
 
 #########################################################################
 # Testing
@@ -275,7 +278,7 @@ install (EXPORT OIIO_EXPORTED_TARGETS
 #                    that is known to be broken, so will only be run
 #                    for "make testall", but not "make test".
 #
-
+if (OIIO_BUILD_TESTS)
 # Make a build/platform/testsuite directory, and copy the master runtest.py
 # there. The rest is up to the tests themselves.
 file (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/testsuite")
@@ -440,7 +443,7 @@ if (SPI_TESTS)
     IMAGEDIR spi-oiio-tests
     URL "noplace -- it's SPI specific tests")
 endif ()
-
+endif()
 
 
 #########################################################################

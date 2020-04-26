@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <string>
 
-#include <OpenEXR/half.h>
+#include <half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/strutil.h>

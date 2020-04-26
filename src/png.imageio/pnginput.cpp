@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <OpenEXR/ImathColor.h>
+#include <ImathColor.h>
 
 #include "png_pvt.h"
 

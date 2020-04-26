@@ -30,7 +30,7 @@
 #include <map>
 #include <vector>
 
-#include <OpenEXR/half.h>
+#include <IlmBase/Half/half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/imagebuf.h>

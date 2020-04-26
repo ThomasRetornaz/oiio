@@ -6,9 +6,9 @@
 /// ImageBufAlgo functions for filtered transformations
 
 
-#include <OpenEXR/ImathBox.h>
-#include <OpenEXR/ImathMatrix.h>
-#include <OpenEXR/half.h>
+#include <IlmBase/Imath/ImathBox.h>
+#include <IlmBase/Imath/ImathMatrix.h>
+#include <IlmBase/Half/half.h>
 
 #include <cmath>
 #include <memory>

@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <numeric>
 
-#include <OpenEXR/half.h>
+#include <half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/deepdata.h>
