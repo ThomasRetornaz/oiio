@@ -146,6 +146,8 @@ if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_APPLECLANG)
         # Don't warn about using unknown preprocessor symbols in #if'set
         add_compile_options ("-Wno-expansion-to-defined")
     endif ()
+    add_compile_options("-Wno-deprecated-register")
+    add_compile_options("-Wno-implicit-float-conversion")
 endif ()
 
 if (CMAKE_COMPILER_IS_GNUCC AND NOT (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_APPLECLANG))
