@@ -1734,7 +1734,7 @@ TIFFInput::read_native_scanlines(int subimage, int miplevel, int ybegin,
                        err.size() ? err.c_str() : "unknown error");
                 ok = false;
             }
-            auto uncompress_etc = [=, &ok](int /*id*/) {
+            auto uncompress_etc = [=, this, & ok](int /*id*/) {
                 uncompress_one_strip(cbuf, (unsigned long)csize, data,
                                      strip_bytes, this->m_spec.nchannels,
                                      this->m_spec.width, m_rowsperstrip,
@@ -1993,7 +1993,7 @@ TIFFInput::read_native_tiles(int subimage, int miplevel, int xbegin, int xend,
                     return false;
                 }
                 // Push the rest of the work onto the thread pool queue
-                tasks.push(pool->push([=, &ok](int /*id*/) {
+                tasks.push(pool->push([=, this, &ok](int /*id*/) {
                     uncompress_one_strip(cbuf, (unsigned long)csize, ubuf,
                                          tile_bytes, this->m_spec.nchannels,
                                          this->m_spec.tile_width,
