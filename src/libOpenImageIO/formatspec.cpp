@@ -21,7 +21,7 @@
 #if USE_EXTERNAL_PUGIXML
 #    include "pugixml.hpp"
 #else
-#    include <OpenImageIO/pugixml.hpp>
+#    include <OpenImageIO/detail/pugixml/pugixml.hpp>
 #endif
 
 #ifdef USE_BOOST_REGEX
@@ -418,14 +418,14 @@ ImageSpec::find_attribute(string_view name, ParamValue& tmpparam,
     if (iter != extra_attribs.end())
         return &(*iter);
         // Check named items in the ImageSpec structs, not in extra_attrubs
-#define MATCH(n, t)                                                            \
-    (((!casesensitive && Strutil::iequals(name, n))                            \
-      || (casesensitive && name == n))                                         \
+#define MATCH(n, t)                                 \
+    (((!casesensitive && Strutil::iequals(name, n)) \
+      || (casesensitive && name == n))              \
      && (searchtype == TypeDesc::UNKNOWN || searchtype == t))
-#define GETINT(n)                                                              \
-    if (MATCH(#n, TypeInt)) {                                                  \
-        tmpparam.init(#n, TypeInt, 1, &this->n);                               \
-        return &tmpparam;                                                      \
+#define GETINT(n)                                \
+    if (MATCH(#n, TypeInt)) {                    \
+        tmpparam.init(#n, TypeInt, 1, &this->n); \
+        return &tmpparam;                        \
     }
     GETINT(nchannels);
     GETINT(width);
@@ -1037,7 +1037,7 @@ ImageSpec::serialize(SerialFormat fmt, SerialVerbose verbose) const
                    depth > 1 ? "volume " : "");
     if (channelformats.size()) {
         for (size_t c = 0; c < channelformats.size(); ++c)
-            out << sprintf("%s%s", c ? "/" : "", channelformats[c]);
+            out << sprintf("%s%s", c ? "/" : "", channelformats[c].c_str());
     } else {
         int bits = get_int_attribute("oiio:BitsPerSample", 0);
         out << extended_format_name(this->format, bits);
@@ -1052,7 +1052,7 @@ ImageSpec::serialize(SerialFormat fmt, SerialVerbose verbose) const
             else
                 out << "unknown";
             if (i < (int)channelformats.size())
-                out << sprintf(" (%s)", channelformats[i]);
+                out << " (" << channelformats[i] << ")";
             if (i < nchannels - 1)
                 out << ", ";
         }
@@ -1173,7 +1173,7 @@ pvt::check_texture_metadata_sanity(ImageSpec& spec)
     string_view software      = spec.get_string_attribute("Software");
     string_view textureformat = spec.get_string_attribute("textureformat");
     if (textureformat == "" ||   // no `textureformat` tag -- not a texture
-        spec.tile_width == 0 ||  // scanline file -- definitly not a texture
+        spec.tile_width == 0 ||  // scanline file -- definitely not a texture
         (!Strutil::istarts_with(software, "OpenImageIO")
          && !Strutil::istarts_with(software, "maketx"))
         // assume not maketx output if it doesn't say so in the software field

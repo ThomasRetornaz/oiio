@@ -65,9 +65,7 @@ set (OpenJpeg_include_paths
      /usr/include/openjpeg-2.3
      /usr/include/openjpeg-2.2
      /usr/include/openjpeg-2.1
-     /usr/include/openjpeg-1.5
      /usr/include/openjpeg
-     /usr/local/include/openjpeg-1.5
      /usr/include
      /opt/local/include
      /opt/local/include/openjpeg-2.3
@@ -152,8 +150,7 @@ endif ()
 
 # Use the standard function to handle OPENJPEG_FOUND
 FIND_PACKAGE_HANDLE_STANDARD_ARGS (OpenJpeg
-  FOUND_VAR OPENJPEG_FOUND
-  VERSION_VAR ${OPENJPEG_VERSION}
+  VERSION_VAR OPENJPEG_VERSION
   REQUIRED_VARS OPENJPEG_INCLUDE_DIR ${OpenJpeg_libvars})
 
 if (OPENJPEG_FOUND)

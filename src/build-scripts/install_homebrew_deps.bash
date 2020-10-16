@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script, which assumes it is runnign on a Mac OSX with Homebrew
 # installed, does a "brew install" in all packages reasonably needed by
@@ -25,7 +25,7 @@ if [[ "$BUILDTARGET" == "clang-format" ]] ; then
     # If we are running for the sake of clang-format only, just install the
     # bare minimum packages and return.
     brew install --display-times ilmbase openexr llvm clang-format libtiff libpng boost ninja giflib
-    brew install --display-times python && true
+    brew install --display-times python pybind11 && true
     brew upgrade --display-times python && true
     brew link --overwrite python
     brew upgrade --display-times cmake && true
@@ -39,10 +39,12 @@ else
     brew upgrade --display-times cmake && true
     brew install --display-times libtiff ilmbase openexr opencolorio
     brew install --display-times libpng giflib webp jpeg-turbo openjpeg
-    brew install --display-times freetype libraw dcmtk pybind11 numpy
-    brew install --display-times field3d ffmpeg libheif libsquish
-    brew install --display-times openvdb tbb
-    brew install --display-times opencv qt ptex
+    brew install --display-times freetype libraw dcmtk pybind11 numpy && true
+    brew install --display-times ffmpeg libheif libsquish ptex && true
+    brew install --display-times openvdb tbb && true
+    brew install --display-times opencv && true
+    brew install --display-times qt
+    brew install --display-times field3d && true
 fi
 
 if [[ "$LINKSTATIC" == "1" ]] ; then
@@ -68,7 +70,7 @@ pip install numpy
 export PATH=/usr/local/opt/qt5/bin:$PATH ;
 export PATH=/usr/local/opt/python/libexec/bin:$PATH ;
 export PYTHONPATH=/usr/local/lib/python${PYTHON_VERSION}/site-packages:$PYTHONPATH ;
-export PATH=/usr/local/Cellar/llvm/9.0.0*/bin:$PATH ;
+export PATH=/usr/local/opt/llvm/bin:$PATH ;
 
 # If field3d and hdf5 get even slightly out of sync, hdf5 will throw fits.
 # This is unnecessary, so we disable the step to make CI more likely to

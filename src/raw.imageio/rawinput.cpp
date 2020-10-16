@@ -19,7 +19,7 @@
 #    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
-#if OIIO_CPLUSPLUS_VERSION >= 17                                               \
+#if OIIO_CPLUSPLUS_VERSION >= 17 \
     && (OIIO_CLANG_VERSION || OIIO_APPLE_CLANG_VERSION)
 // libraw uses auto_ptr, which is not in C++17 at all for clang, though
 // it does seem to be for gcc. So for clang, alias it to unique_ptr.
@@ -329,7 +329,7 @@ RawInput::open(const std::string& name, ImageSpec& newspec,
     m_config   = config;
 
     // For a fresh open, we are concerned with just reading all the
-    // meatadata quickly, because maybe that's all that will be needed. So
+    // metadata quickly, because maybe that's all that will be needed. So
     // call open_raw passing unpack=false. This will not read the pixels! We
     // will need to close and re-open with unpack=true if and when we need
     // the actual pixel values.
@@ -346,7 +346,16 @@ RawInput::open_raw(bool unpack, const std::string& name,
                    const ImageSpec& config)
 {
     // std::cout << "open_raw " << name << " unpack=" << unpack << "\n";
-    m_processor.reset(new LibRaw);
+    {
+        // See https://github.com/OpenImageIO/oiio/issues/2630
+        // Something inside LibRaw constructor is not thread safe. Use a
+        // static mutex here to make sure only one thread is constructing a
+        // LibRaw at a time. Cross fingers and hope all the rest of LibRaw
+        // is re-entrant.
+        static std::mutex libraw_ctr_mutex;
+        std::lock_guard<std::mutex> lock(libraw_ctr_mutex);
+        m_processor.reset(new LibRaw);
+    }
 
     // Temp spec for exif parser callback to dump into
     ImageSpec exifspec;
@@ -440,7 +449,7 @@ RawInput::open_raw(bool unpack, const std::string& name,
         = config.get_int_attribute("raw:use_camera_matrix", 1);
 
     // Check to see if the user has explicitly requested output colorspace
-    // primaries via a configuration hinnt "raw:ColorSpace". The default if
+    // primaries via a configuration hint "raw:ColorSpace". The default if
     // there is no such hint is convert to sRGB, so that if somebody just
     // naively reads a raw image and slaps it into a framebuffer for
     // display, it will work just like a jpeg. More sophisticated users
@@ -596,6 +605,15 @@ RawInput::open_raw(bool unpack, const std::string& name,
 
     const libraw_image_sizes_t& sizes(m_processor->imgdata.sizes);
     m_spec.attribute("PixelAspectRatio", (float)sizes.pixel_aspect);
+
+    // Libraw rotate the pixels automatically.
+    // The "flip" field gives the information about this rotation.
+    // This rotation is dependent on the camera orientation sensor.
+    // This information may be important for the user.
+    if (sizes.flip != 0) {
+        m_spec.attribute("raw:flip", sizes.flip);
+    }
+
     // FIXME: sizes. top_margin, left_margin, raw_pitch, mask?
 
     const libraw_iparams_t& idata(m_processor->imgdata.idata);
@@ -644,8 +662,12 @@ RawInput::open_raw(bool unpack, const std::string& name,
 #if LIBRAW_VERSION >= LIBRAW_MAKE_VERSION(0, 17, 0)
     if (other.parsed_gps.gpsparsed) {
         add("GPS", "Latitude", other.parsed_gps.latitude, false, 0.0f);
+#    if LIBRAW_VERSION >= LIBRAW_MAKE_VERSION(0, 20, 0)
+        add("GPS", "Longitude", other.parsed_gps.longitude, false, 0.0f);
+#    else
         add("GPS", "Longitude", other.parsed_gps.longtitude, false,
             0.0f);  // N.B. wrong spelling!
+#    endif
         add("GPS", "TimeStamp", other.parsed_gps.gpstimestamp, false, 0.0f);
         add("GPS", "Altitude", other.parsed_gps.altitude, false, 0.0f);
         add("GPS", "LatitudeRef", string_view(&other.parsed_gps.latref, 1),

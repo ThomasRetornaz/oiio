@@ -185,13 +185,13 @@ public:
     /// Retrive an integer, with converstions from a wide variety of type
     /// cases, including unsigned, short, byte. Not float. It will retrive
     /// from a string, but only if the string is entirely a valid int
-    /// format. Unconvertable types return the default value.
+    /// format. Unconvertible types return the default value.
     int get_int(int defaultval = 0) const;
     int get_int_indexed(int index, int defaultval = 0) const;
 
     /// Retrive a float, with converstions from a wide variety of type
     /// cases, including integers. It will retrive from a string, but only
-    /// if the string is entirely a valid float format. Unconvertable types
+    /// if the string is entirely a valid float format. Unconvertible types
     /// return the default value.
     float get_float(float defaultval = 0) const;
     float get_float_indexed(int index, float defaultval = 0) const;
@@ -257,6 +257,22 @@ public:
                         bool casesensitive = true) const;
     const_iterator find(ustring name, TypeDesc type = TypeDesc::UNKNOWN,
                         bool casesensitive = true) const;
+
+    /// Search for the first entry with matching name, etc., and return
+    /// a pointer to it, or nullptr if it is not found.
+    ParamValue* find_pv(string_view name, TypeDesc type = TypeDesc::UNKNOWN,
+                        bool casesensitive = true)
+    {
+        iterator f = find(name, type, casesensitive);
+        return f != end() ? &(*f) : nullptr;
+    }
+    const ParamValue* find_pv(string_view name,
+                              TypeDesc type      = TypeDesc::UNKNOWN,
+                              bool casesensitive = true) const
+    {
+        const_iterator f = find(name, type, casesensitive);
+        return f != cend() ? &(*f) : nullptr;
+    }
 
     /// Case insensitive search for an integer, with default if not found.
     /// Automatically will return an int even if the data is really
@@ -334,7 +350,7 @@ public:
         attribute(name, TypeString, 1, &v);
     }
 
-    /// Search list for named item, return its type or TypeUnknnown if not
+    /// Search list for named item, return its type or TypeUnknown if not
     /// found.
     TypeDesc getattributetype(string_view name,
                               bool casesensitive = false) const
@@ -351,6 +367,15 @@ public:
     /// Shortcut for retrieving a single string via getattribute.
     bool getattribute(string_view name, std::string& value,
                       bool casesensitive = false) const;
+
+    /// Retrieve from list: If found its data type is reasonably convertible
+    /// to `type`, copy/convert the value into val[...] and return true.
+    /// Otherwise, return false and don't modify what val points to.
+    bool getattribute_indexed(string_view name, int index, TypeDesc type,
+                              void* value, bool casesensitive = false) const;
+    /// Shortcut for retrieving a single string via getattribute.
+    bool getattribute_indexed(string_view name, int index, std::string& value,
+                              bool casesensitive = false) const;
 
     /// Sort alphabetically, optionally case-insensitively, locale-
     /// independently, and with all the "un-namespaced" items appearing

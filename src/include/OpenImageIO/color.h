@@ -9,11 +9,10 @@
 #include <OpenImageIO/export.h>
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imageio.h>
-#include <OpenImageIO/oiioversion.h>
 #include <OpenImageIO/typedesc.h>
 #include <OpenImageIO/ustring.h>
 
-#include <IlmBase/Imath/ImathMatrix.h> /* because we need M44f */
+#include <ImathMatrix.h> /* because we need M44f */
 
 
 OIIO_NAMESPACE_BEGIN
@@ -42,7 +41,7 @@ public:
 };
 
 // Preprocessor symbol to allow conditional compilation depending on
-// whether the ColorProcesor class is exposed (it was not prior to OIIO 1.9).
+// whether the ColorProcessor class is exposed (it was not prior to OIIO 1.9).
 #define OIIO_HAS_COLORPROCESSOR 1
 
 
@@ -117,6 +116,15 @@ public:
     /// or NULL if none could be identified.
     const char* getColorSpaceFamilyByName(string_view name) const;
 
+    // Get the number of Roles defined in this configuration
+    int getNumRoles() const;
+
+    /// Query the name of the specified Role.
+    const char* getRoleByIndex(int index) const;
+
+    /// Retrieve the full list of known Roles, as a vector of strings.
+    std::vector<std::string> getRoles() const;
+
     /// Get the number of Looks defined in this configuration
     int getNumLooks() const;
 
@@ -128,7 +136,7 @@ public:
 
     /// Given the specified input and output ColorSpace, request a handle to
     /// a ColorProcessor.  It is possible that this will return an empty
-    /// handle, if the inputColorSpace doesnt exist, the outputColorSpace
+    /// handle, if the inputColorSpace doesn't exist, the outputColorSpace
     /// doesn't exist, or if the specified transformation is illegal (for
     /// example, it may require the inversion of a 3D-LUT, etc).
     ///

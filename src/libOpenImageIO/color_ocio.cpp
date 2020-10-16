@@ -19,11 +19,19 @@
 
 #include "imageio_pvt.h"
 
+#define MAKE_OCIO_VERSION_HEX(maj, min, patch) \
+    (((maj) << 24) | ((min) << 16) | (patch))
+
 #ifdef USE_OCIO
 #    include <OpenColorIO/OpenColorIO.h>
+#    if OCIO_VERSION_HEX >= MAKE_OCIO_VERSION_HEX(2, 0, 0)
+#        define OCIO_v2 1
+#        include <OpenColorIO/apphelpers/ColorSpaceHelpers.h>
+#        include <OpenColorIO/apphelpers/DisplayViewHelpers.h>
+#        include <OpenColorIO/apphelpers/ViewingPipeline.h>
+#    endif
 namespace OCIO = OCIO_NAMESPACE;
 #endif
-
 
 OIIO_NAMESPACE_BEGIN
 
@@ -384,6 +392,36 @@ ColorConfig::getColorSpaceNames() const
     return result;
 }
 
+int
+ColorConfig::getNumRoles() const
+{
+#ifdef USE_OCIO
+    if (getImpl()->config_)
+        return getImpl()->config_->getNumRoles();
+#endif
+    return 0;
+}
+
+const char*
+ColorConfig::getRoleByIndex(int index) const
+{
+#ifdef USE_OCIO
+    if (getImpl()->config_)
+        return getImpl()->config_->getRoleName(index);
+#endif
+    return NULL;
+}
+
+
+std::vector<std::string>
+ColorConfig::getRoles() const
+{
+    std::vector<std::string> result;
+    for (int i = 0, e = getNumRoles(); i != e; ++i)
+        result.emplace_back(getRoleByIndex(i));
+    return result;
+}
+
 
 
 int
@@ -591,12 +629,39 @@ ColorConfig::configname() const
 
 
 #ifdef USE_OCIO
+
+#    if OCIO_VERSION_HEX >= 0x02000000
+inline OCIO::BitDepth
+ocio_bitdepth(TypeDesc type)
+{
+    if (type == TypeDesc::UINT8)
+        return OCIO::BIT_DEPTH_UINT8;
+    if (type == TypeDesc::UINT16)
+        return OCIO::BIT_DEPTH_UINT16;
+    if (type == TypeDesc::UINT32)
+        return OCIO::BIT_DEPTH_UINT32;
+    // N.B.: OCIOv2 also supports 10, 12, and 14 bit int, but we won't
+    // ever have data in that format at this stage.
+    if (type == TypeDesc::HALF)
+        return OCIO::BIT_DEPTH_F16;
+    if (type == TypeDesc::FLOAT)
+        return OCIO::BIT_DEPTH_F32;
+    return OCIO::BIT_DEPTH_UNKNOWN;
+}
+#    endif
+
+
 // Custom ColorProcessor that wraps an OpenColorIO Processor.
 class ColorProcessor_OCIO : public ColorProcessor {
 public:
     ColorProcessor_OCIO(OCIO::ConstProcessorRcPtr p)
-        : m_p(p) {};
-    virtual ~ColorProcessor_OCIO(void) {};
+        : m_p(p)
+#    if OCIO_VERSION_HEX >= 0x02000000
+        , m_cpuproc(p->getDefaultCPUProcessor())
+#    endif
+    {
+    }
+    virtual ~ColorProcessor_OCIO(void) {}
 
     virtual bool isNoOp() const { return m_p->isNoOp(); }
     virtual bool hasChannelCrosstalk() const
@@ -607,13 +672,23 @@ public:
                        stride_t chanstride, stride_t xstride,
                        stride_t ystride) const
     {
+#    if OCIO_VERSION_HEX >= 0x02000000
+        OCIO::PackedImageDesc pid(data, width, height, channels,
+                                  OCIO::BIT_DEPTH_F32,  // For now, only float
+                                  chanstride, xstride, ystride);
+        m_cpuproc->apply(pid);
+#    else
         OCIO::PackedImageDesc pid(data, width, height, channels, chanstride,
                                   xstride, ystride);
         m_p->apply(pid);
+#    endif
     }
 
 private:
     OCIO::ConstProcessorRcPtr m_p;
+#    if OCIO_VERSION_HEX >= 0x02000000
+    OCIO::ConstCPUProcessorRcPtr m_cpuproc;
+#    endif
 };
 #endif
 
@@ -804,7 +879,7 @@ public:
 
 
 
-// ColorProcessor that implements a matrix multiply color transfomation.
+// ColorProcessor that implements a matrix multiply color transformation.
 class ColorProcessor_Matrix : public ColorProcessor {
 public:
     ColorProcessor_Matrix(const Imath::M44f& Matrix, bool inverse)
@@ -1003,7 +1078,7 @@ ColorConfig::createColorProcessor(ustring inputColorSpace,
 
 #ifdef USE_OCIO
     if (!handle && p) {
-        // If we found a procesor from OCIO, even if it was a NoOp, and we
+        // If we found a processor from OCIO, even if it was a NoOp, and we
         // still don't have a better idea, return it.
         handle = ColorProcessorHandle(new ColorProcessor_OCIO(p));
     }
@@ -1133,21 +1208,29 @@ ColorConfig::createDisplayTransform(ustring display, ustring view,
     // Ask OCIO to make a Processor that can handle the requested
     // transformation.
     if (getImpl()->config_) {
-        OCIO::ConstConfigRcPtr config         = getImpl()->config_;
-        OCIO::DisplayTransformRcPtr transform = OCIO::DisplayTransform::Create();
+        OCIO::ConstConfigRcPtr config = getImpl()->config_;
+#    ifdef OCIO_v2
+        auto transform = OCIO::DisplayViewTransform::Create();
+        transform->setSrc(inputColorSpace.c_str());
+        if (looks.size()) {
+            getImpl()->error(
+                "createDisplayTransform: looks overrides are not allowed in OpenColorIO v2");
+        }
+#    else
+        auto transform = OCIO::DisplayTransform::Create();
         transform->setInputColorSpaceName(inputColorSpace.c_str());
-        transform->setDisplay(display.c_str());
-        transform->setView(view.c_str());
         if (looks.size()) {
             transform->setLooksOverride(looks.c_str());
             transform->setLooksOverrideEnabled(true);
         } else {
             transform->setLooksOverrideEnabled(false);
         }
-        OCIO::ConstContextRcPtr context = config->getCurrentContext();
-        std::vector<string_view> keys, values;
-        Strutil::split(context_key, keys, ",");
-        Strutil::split(context_value, values, ",");
+#    endif
+        transform->setDisplay(display.c_str());
+        transform->setView(view.c_str());
+        auto context = config->getCurrentContext();
+        auto keys    = Strutil::splits(context_key, ",");
+        auto values  = Strutil::splits(context_value, ",");
         if (keys.size() && values.size() && keys.size() == values.size()) {
             OCIO::ContextRcPtr ctx = context->createEditableCopy();
             for (size_t i = 0; i < keys.size(); ++i)

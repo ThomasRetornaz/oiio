@@ -5,6 +5,12 @@
 
 .. highlight:: bash
 
+.. |nbsp| unicode:: U+00A0 .. NO-BREAK SPACE
+
+.. |spc| replace:: |nbsp| |nbsp| |nbsp|
+
+
+
 Overview
 ========
 
@@ -58,8 +64,8 @@ will be an unaltered copy of :file:`in.tif`.
 Optional arguments
 -----------------------
 
-Some commands stand completely on their own (like `--flip`), others
-take one or more arguments (like `--resize` or `-o`)::
+Some commands stand completely on their own (like `--flip`), others take one
+or more subsequuent command line arguments (like `--resize` or `-o`)::
 
     oiiotool foo.jpg --flip --resize 640x480 -o out.tif
 
@@ -207,9 +213,12 @@ contents of an expression may be any of:
   * `file_extension` : the extension of the file (e.g., `tif`)
   * `geom` : the pixel data size in the form `640x480+0+0`)
   * `full_geom` : the "full" or "display" size)
-  * `MINCOLOR` : the minimum value in each channel(channels are comma-separated)
-  * `MAXCOLOR` : the maximum value in each channel(channels are comma-separated)
-  * `AVGCOLOR` : the average pixel value of the image (channels are comma-separated)
+  * `MINCOLOR` : the minimum value in each channel (channels are
+    comma-separated)
+  * `MAXCOLOR` : the maximum value in each channel (channels are
+    comma-separated)
+  * `AVGCOLOR` : the average pixel value of the image (channels are
+    comma-separated)
 
 * *imagename.'metadata'*
 
@@ -257,6 +266,55 @@ evaluation with the `--evaloff` end `--evalon` flags. For example::
 
     $ oiiotool --info --evaloff "{weird}.exr"
     > weird.exr            : 2048 x 1536, 3 channel, half openexr
+
+
+.. _sec-oiiotool-subimage-modifier:
+
+Dealing with multi-subimage/multi-part files
+----------------------------------------------
+
+
+Some file formats allow storing multiple images in one file (notably
+OpenEXR, which calls them "multi-part"). There are some special behaviors to
+be aware of for multi-subimage files.
+
+Using :program:`oiiotool` for a simple input-to-output copy will preserve
+all of the subimages (assuming that the output format can accommodate
+multiple subimages)::
+
+    oiiotool multipart.exr -o another.exr
+
+Most :program:`oiiotool` commands by default work on just the *first*
+subimage of their input, discarding the others. For example::
+
+    oiiotool multipart.exr --colorconvert lnf aces -o out.exr
+
+In this example, only the first subimage in `multipart.exr` will be color
+transformed and output to `out.exr`.
+
+Using the `-a` command tells :program:`oiiotool` to try to preserve all
+subimges from the inputs and apply all computations to all subimages::
+
+    oiiotool -a multipart.exr --colorconvert lnf aces -o out.exr
+
+Now all subimages of `multipart.exr` will be transformed and output.
+
+But that might not be enough. Perhaps there are some subimages that need the
+color conversion, and others that do not. Many :program:`oiiotool` commands
+take an optional modifier `:subimages=...` that can restrict the operation
+to certain subimages. The argument is a comma-separated list of any of the
+following: (a) an integer index of a subimage to include, or a minus sign
+(`-`) followed by an integer index of a subimage to exclude; (b) the name
+(as returned by the metadata "oiio:subimagename") of a subimage to include,
+or to excludeif preceded by a `-`; (c) the special string "all", meaning all
+subimages. Examples::
+
+    # Color convert only subimages 0, 3, and 4, leave the rest as-is
+    oiiotool -a multipart.exr --colorconvert:subimages=0,3,4 lnf aces -o out.exr
+
+    # Color convert all subimages EXCEPT the one named "normal"
+    oiiotool -a multipart.exr --colorconvert:subimages=-normal lnf aces -o out.exr
+
 
 
 :program:`oiiotool` Tutorial / Recipes
@@ -569,6 +627,17 @@ it "Z" so it will be recognized as a depth channel::
 
 
 
+Copy metadata from one image to another
+---------------------------------------
+
+Suppose you have a (non-OIIO) application that consumes input Exr files and
+produces output Exr files, but along the way loses crucial metadata from
+the input files that you want carried along. This command will add all the
+metadata from the first image to the pixels of the second image:
+
+    oiiotool metaonly.exr pixelsonly.exr --pastemeta -o combined.exr
+
+
 Fade between two images
 -----------------------
 
@@ -705,7 +774,7 @@ output each one to a different file, with names `sub0001.tif`,
     verbose mode is not turned on, only the resolution and data format are
     printed.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `format=name` : The format name may be one of: `text` (default) for
       readable text, or `xml` for an XML description of the image metadata.
@@ -718,7 +787,7 @@ output each one to a different file, with names `sub0001.tif`,
     execution of command line arguments. The message may contain expressions
     for substitution.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `newline=n` : The number of newlines to print after the message
       (default is 1, but 0 will suppress the newline, and a larger number
@@ -755,7 +824,7 @@ output each one to a different file, with names `sub0001.tif`,
 
     Print to the console detailed information about the values in every pixel.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `empty=` *verbose* : If 0, will cause deep images to skip printing of
       information about pixels with no samples.
@@ -795,7 +864,7 @@ output each one to a different file, with names `sub0001.tif`,
     all pixels of the current image and print a short report of how many
     pixels matched each of the colors.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `eps=r,g,b,...` : Tolerance for matching colors (default:
       0.001 for all channels).
@@ -919,24 +988,29 @@ read and will become the new *current image*, with the previous current
 image pushed onto the image stack.
 
 The `-i` command may be used, which allows additional options that control
-the reading of just that one file. Optional appended arguments include:
+the reading of just that one file.
 
-- `now=` *int* : If 1, read the image now, before proceding to the next
-  command.
-- `autocc=` *int* : Enable or disable `--autocc` for this input image.
-- `info=` *int* : Print info about this file (even if the global `--info`
-  was not used) if nonzero. If the value is 2, print full verbose info (like
-  `--info -v`).
-- `infoformat=` *name* : When printing info, the format may be one of:
-  `text` (default) for readable text, or `xml` for an XML description of the
-  image metadata.
-- `type=` *name* : Upon reading, convert the pixel data to the named type.
-  This can override the default behavior of internally storing whatever type
-  is the most precise one found in the file.
-- `ch=` *name...* : Causes the input to read only the specified channels.
-  This is equivalent to following the input with a `--ch` command,
-  except that by integrating into the `-i`, it potentially can avoid the I/O
-  of the unneeded channels.
+Optional appended modifiers include:
+
+  `:now=` *int*
+    If 1, read the image now, before proceding to the next command.
+  `:autocc=` *int*
+    Enable or disable `--autocc` for this input image.
+  `:info=` *int*
+    Print info about this file (even if the global `--info` was not used) if
+    nonzero. If the value is 2, print full verbose info (like `--info -v`).
+  `:infoformat=` *name*
+    When printing info, the format may be one of: `text` (default) for
+    readable text, or `xml` for an XML description of the image metadata.
+  `:type=` *name*
+    Upon reading, convert the pixel data to the named type. This can
+    override the default behavior of internally storing whatever type is the
+    most precise one found in the file.
+  `:ch=` *name...*
+    Causes the input to read only the specified channels. This is equivalent
+    to following the input with a `--ch` command, except that by integrating
+    into the `-i`, it potentially can avoid the I/O of the unneeded
+    channels.
 
 
 
@@ -1045,7 +1119,7 @@ the reading of just that one file. Optional appended arguments include:
 
     Sets configuration metadata that will apply to the next input file read.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `type=` *typename* : Specify the metadata type.
 
@@ -1071,25 +1145,34 @@ Writing images
     Outputs the current image to the named file.  This does not remove the
     current image from the image stack, it merely saves a copy of it.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
     
-    - `type=` *name* : Set the pixel data type (like `-d`) for this
-      output image (e.g., `uint8`, `uint16`, `half`, `float`, etc.).
-    - `bits=` *int* : Set the bits per pixel (if nonstandard for the
-      datatype) for this output image.
-    - `dither=` *int* : Turn dither on or off for this output. (default: 0)
-    - `autocc=` *int* : Enable or disable `--autocc` for this output image.
-    - `autocrop=` *int* : Enable or disable autocrop for this output image.
-    - `autotrim=` *int* : Enable or disable `--autotrim` for this output
-      image.
-    - `separate=` *int*, `contig=` *int* : Set separate or contiguous planar
-      configuration for this output.
-    - `fileformatname=` *string* : Specify the desired output file format,
-      overriding any guess based on file name extension.
-    - `scanline=` *int* : If nonzero, force scanline output.
-    - `tile=` *int* `x` *int* :  Force tiling with given size.
-    - `all=` *n* : Output all images currently on the stack using a pattern.
-      See further explanation below.
+      `:type=` *name*
+        Set the pixel data type (like `-d`) for this output image (e.g.,
+        `:uint8`, `uint16`, `half`, `float`, etc.).
+      `:bits=` *int*
+        Set the bits per pixel (if nonstandard for the datatype) for this
+        output image.
+      `:dither=` *int*
+        Turn dither on or off for this output. (default: 0)
+      `:autocc=` *int*
+        Enable or disable `--autocc` for this output image.
+      `:autocrop=` *int*
+        Enable or disable autocrop for this output image.
+      `:autotrim=` *int*
+        Enable or disable `--autotrim` for this output image.
+      `:separate=` *int*, `contig=` *int*
+        Set separate or contiguous planar configuration for this output.
+      `:fileformatname=` *string*
+        Specify the desired output file format, overriding any guess based
+        on file name extension.
+      `:scanline=` *int*
+        If nonzero, force scanline output.
+      `:tile=` *int* `x` *int*
+        Force tiling with given size.
+      `:all=` *n*
+        Output all images currently on the stack using a pattern.
+        See further explanation below.
 
     The `all=n` option causes *all* images on the image stack to be output,
     with the filename argument used as a pattern assumed to contain a `%d`,
@@ -1118,40 +1201,51 @@ Writing images
     In addition to all the optional arguments of `-o`, optional appended
     arguments for `-otex`, `-oenv`, and `-obump` also include:
     
-    - `wrap=` *string* & Set the default $s$ and $t$ wrap modes of the
-      texture, to one of: `black`, `clamp`, `periodic`, `mirror`.
-    - `swrap=` *string* & Set the default $s$ wrap mode of the texture.
-    - `twrap=` *string* & Set the default $t$ wrap mode of the
-      texture.
-    - `resize=` *int* & If nonzero, resize to a power of 2 before starting
-      to create the MIPpmap levels. (default: 0)
-    - `nomipmap=` *int* & If nonzero, do not create MIP-map levels at all.
-      (default: 0)
-    - `updatemode=` *int* & If nonzero, do not create and overwrite the
-      existing texture if it appears to already match the source pixels.
-      (default: 0)
-    - `monochrome_detect=` *int* & Detect monochrome (R=G=B) images and turn
-      them into 1-channel textures. (default: 0)
-    - `opaque_detect=` *int* & Detect opaque (A=1) images and drop the alpha
-      channel from the texture. (default: 0)
-    - `unpremult=` *int* & Unpremultiply colors before any per-MIP-level
-      color conversions, and re-premultiply after. (default: 0)
-    - `incolorspace=` *string* & Specify color space conversion.
-    - `outcolorspace=` *string* & ...
-    - `highlightcomp=` *int* & Use highlight compensation for HDR images
-      when resizing for MIP-map levels. (default: 0)
-    - `sharpen=` *float* & Additional sharpening factor when resizing for
-      MIP-map levels. (default: 0.0)
-    - `filter=` *string* & Specify the filter for MIP-map level resizing.
-      (default: box)
-    - `prman_metadata=` *int* & Turn all all options required to make the
-      resulting texture file compatible with PRMan (particular tile sizes,
-      formats, options, and metadata). (default: 0)
-    - `prman_options=` *int* & Include the metadata that PRMan's texture
-      system wants. (default: 0)
-    - `bumpformat=` *string* & For `-obump` only, specifies the
-      interpretation of 3-channel source images as one of: `height`,
-      `normal`, `auto` (default).
+      `:wrap=` *string*
+        Set the default $s$ and $t$ wrap modes of the texture, to one of:
+        `:black`, `clamp`, `periodic`, `mirror`.
+      `:swrap=` *string*
+        Set the default $s$ wrap mode of the texture.
+      `:twrap=` *string*
+        Set the default $t$ wrap mode of the texture.
+      `:resize=` *int*
+        If nonzero, resize to a power of 2 before starting to create the
+        MIPpmap levels. (default: 0)
+      `:nomipmap=` *int*
+        If nonzero, do not create MIP-map levels at all. (default: 0)
+      `:updatemode=` *int*
+        If nonzero, do not create and overwrite the existing texture if it
+        appears to already match the source pixels. (default: 0)
+      `:monochrome_detect=` *int*
+        Detect monochrome (R=G=B) images and turn them into 1-channel
+        textures. (default: 0)
+      `:opaque_detect=` *int*
+        Detect opaque (A=1) images and drop the alpha channel from the
+        texture. (default: 0)
+      `:unpremult=` *int*
+        Unpremultiply colors before any per-MIP-level color conversions, and
+        re-premultiply after. (default: 0)
+      `:incolorspace=` *string*
+        Specify color space conversion.
+      `:outcolorspace=` *string*
+        ...
+      `:highlightcomp=` *int*
+        Use highlight compensation for HDR images when resizing for MIP-map
+        levels. (default: 0)
+      `:sharpen=` *float*
+        Additional sharpening factor when resizing for MIP-map levels.
+        (default: 0.0)
+      `:filter=` *string*
+        Specify the filter for MIP-map level resizing. (default: box)
+      `:prman_metadata=` *int*
+        Turn all all options required to make the resulting texture file
+        compatible with PRMan (particular tile sizes, formats, options, and
+        metadata). (default: 0)
+      `:prman_options=` *int*
+        Include the metadata that PRMan's texture system wants. (default: 0)
+      `:bumpformat=` *string*
+        For `-obump` only, specifies the interpretation of 3-channel source
+        images as one of: `height`, `normal`, `auto` (default).
 
 
     Examples::
@@ -1293,7 +1387,7 @@ current top image.
     Adds or replaces metadata with the given *name* to have the specified
     *value*.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `type=` *typename* : Specify the metadata type.
     
@@ -1459,6 +1553,12 @@ current top image.
     will rename channel 3 to be "A" and channel 4 to be
     "Z", but will leave channels 0--3 with their old names.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+        Only included subimages will have their channels renamed.
+
 
 .. _sec-oiiotool-shuffle-channels-or-subimages:
 
@@ -1481,10 +1581,14 @@ current top image.
 
 .. option:: --subimage <n>
 
-    If the current image has multiple subimages, extract the specified
-    subimage. The subimage specifier *n* is either an integer giving the
-    index of the subimage to extract (starting with 0), or the *name* of the
-    subimage to extract (comparing to the `"oiio:subimagename"` metadata).
+    If the current image has multiple subimages, replace it with just the
+    specified subimage. The subimage specifier *n* is either an integer
+    giving the index of the subimage to extract (starting with 0), or the
+    *name* of the subimage to extract (comparing to the
+    `"oiio:subimagename"` metadata).
+
+    Additionally, this command can be used to remove one subimage (leaving
+    the others) by using the optional modifier `--subimage:delete=1`.
 
 .. option:: --sisplit
 
@@ -1526,6 +1630,12 @@ current top image.
 
     Replaces the top two images on the stack with a new image comprised of
     the channels of both images appended together.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 
 
 :program:`oiiotool` commands that adjust the image stack
@@ -1729,6 +1839,11 @@ current top image.
     values (with no spaces!) may be used to specifiy a different value to
     add to each channel in the image.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Examples::
 
         oiiotool imageA.tif imageB.tif --add -o sum.jpg
@@ -1758,6 +1873,11 @@ current top image.
     constant values (with no spaces!) may be used to specifiy a different
     value to subtract from each channel in the image.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 
 .. option:: --mul
             -- mulc <value>
@@ -1772,6 +1892,11 @@ current top image.
     constant values (with no spaces!) may be used to specifiy a different
     value to multiply with each channel in the image.
     
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         # Scale image brightness to 20% of its original
@@ -1800,7 +1925,12 @@ current top image.
     series of comma-separated constant values (with no spaces!) may be used
     to specifiy a different multiplier for each channel in the image,
     respectively.
-    
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 
 .. option:: --mad
 
@@ -1809,6 +1939,10 @@ current top image.
     stack. Note that `A B C --mad` is equivalent to `A B --mul C --add`,
     though using `--mad` may be somewhat faster and preserve more precision.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
 
 .. option:: --invert
@@ -1816,6 +1950,11 @@ current top image.
     Replace the top images with its color inverse. It only inverts the first
     three channels, in order to preserve alpha.
     
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
        oiiotool tahoe.jpg --inverse -o inverse.jpg
@@ -1837,19 +1976,36 @@ current top image.
     replace the top image by the absolute value of the difference between
     each pixel and a constant color (`--absdiffc`).
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
+
 .. option:: --abs
 
     Replace the current image with a new image that has each pixel
     consisting of the *absolute value* of the old pixel value.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 .. option:: --powc <value>
             --powc <value0,value1,value2...>
 
     Raise all the pixel values in the top image to a constant power value.
-    If a single constant value is given, all color channels will have their values
-    raised to this power.  Alternatively, a series of
-    comma-separated constant values (with no spaces!) may be used to specifiy a
-    different exponent for each channel in the image, respectively.
+    If a single constant value is given, all color channels will have their
+    values raised to this power.  Alternatively, a series of comma-separated
+    constant values (with no spaces!) may be used to specifiy a different
+    exponent for each channel in the image, respectively.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 
 .. option:: --noise
 
@@ -1863,11 +2019,20 @@ current top image.
     (default: 0.1) is replaced with value given by option `value=` (default:
     0).
     
-    For any of these noise types, the option `seed=` can be used to change
-    the random number seed, `mono=1` can be used to make monochromatic noise
-    (same value in all channels), and `nchannels=` can be used to limit
-    which channels are affected by the noise
-    
+    Optional appended modifiers include:
+
+      `:seed=` *int*
+        Can be used to change the random number seed.
+
+      `:mono=1`
+        Make monochromatic noise (same value in all channels).
+
+      `:nchannels=` *int*
+        Limit which channels are affected by the noise.
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         # Add color gaussian noise to an image
@@ -1902,11 +2067,17 @@ current top image.
     whose value at each pixel is the sum of all channels of the original
     image.  Using the optional weight allows you to customize the
     weight of each channel in the sum.
-    
-    - `weight=` *r,g,...* : Specify the weight of each channel (default: 1).
-    
+
+    Optional appended modifiers include:
+
+      `weight=` *r,g,...*
+        Specify the weight of each channel (default: 1).
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
-    
+
         oiiotool RGB.tif --chsum:weight=.2126,.7152,.0722 -o luma.tif
 
     ..
@@ -1923,19 +2094,28 @@ current top image.
     Remap pixel values from [black, white] to [min, max], with an optional
     smooth sigmoidal contrast stretch as well.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-    - `black=` *vals* : Specify black value(s), default 0.0.
-    - `white=` *vals* : Specify white value(s), default 1.0.
-    - `min=` *vals* : Specify the minimum range value(s), default 0.0.
-    - `max=` *vals* : Specify the maximum range value(s), default 1.0.
-    - `scontrast=` *vals* : Specify sigmoidal contrast slope value(s),
+      `black=` *vals*
+        Specify black value(s), default 0.0.
+      `white=` *vals*
+        Specify white value(s), default 1.0.
+      `min=` *vals*
+        Specify the minimum range value(s), default 0.0.
+      `max=` *vals*
+        Specify the maximum range value(s), default 1.0.
+      `scontrast=` *vals*
+        Specify sigmoidal contrast slope value(s),
       default 1.0.
-    - `sthresh=` *vals* : Specify sigmoidal threshold value(s) giving the
-      position of maximum slope, default 0.5.
-    - `clamp=` *on* : If *on* is nonzero, will optionally clamp all result
-      channels to [min,max].
-    
+      `sthresh=` *vals*
+        Specify sigmoidal threshold value(s) giving the position of maximum
+        slope, default 0.5.
+      `clamp=` *on*
+        If *on* is nonzero, will optionally clamp all result channels to
+        [min,max].
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Each *vals* may be either a single floating point value for all
     channels, or a comma-separated list of per-channel values.
 
@@ -1980,6 +2160,11 @@ current top image.
     flashy "spectrum" colors --- it is an empirically bad color map compared
     to the preferred ones.
     
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         oiiotool tahoe.jpg --colormap inferno -o inferno.jpg
@@ -2049,10 +2234,27 @@ current top image.
         oiiotool img*.exr -paste:mergeroi=1:all=1 +0+0 -o combined.exr
 
 
+.. option:: --pastemeta <location>
+
+    Takes two images -- the first will be a source of metadata only, and the
+    second the source of pixels -- and produces a new copy of the second
+    image with the metadata from the first image added.
+
+    The output image's pixels will come only from the second input. Metadata
+    from the second input will be preserved if no identically-named metadata
+    was present in the first input image.
+
+    Examples::
+
+        # Add all the metadata from meta.exr to pixels.exr and write the
+        # combined image to out.exr.
+        oiiotool meta.exr pixels.exr --pastemeta -o out.exr
+
+
 .. option:: --mosaic <size>
 
     Removes :math:`w \times h` images, dictated by the *size*, and turns
-    them into a single image mosaic. Optional appended arguments include:
+    them into a single image mosaic. Optional appended modifiers include:
 
     - `pad=` *num* : Select the number of pixels of black padding to add
       between images (default: 0).
@@ -2071,6 +2273,11 @@ current top image.
     image as the background. Both input images must have the same number and
     order of channels and must contain an alpha channel.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 .. option:: --zover
 
     Replace the *two* top images with a new image that is a *depth
@@ -2079,18 +2286,26 @@ current top image.
     images is the foreground and which background, depending on the "Z"
     channel values for that pixel (larger Z means farther away). Both input
     images must have the same number and order of channels and must contain
-    both depth/Z and alpha channels. Optional appended arguments include:
+    both depth/Z and alpha channels. Optional appended modifiers include:
     
-    - `zeroisinf=` *num* : If nonzero, indicates that z=0 pixels should be
-      treated as if they were infinitely far away. (The default is 0,
-      meaning that "zero means zero."").
+      `zeroisinf=` *num*
+        If nonzero, indicates that z=0 pixels should be treated as if they
+        were infinitely far away. (The default is 0, meaning that "zero
+        means zero."").
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
 
 .. option:: --rotate90
 
     Replace the current image with a new image that is rotated 90 degrees
     clockwise.
-    
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         oiiotool grid.jpg --rotate90 -o rotate90.jpg
@@ -2107,7 +2322,12 @@ current top image.
 
     Replace the current image with a new image that is rotated by
     180 degrees.
-    
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         oiiotool grid.jpg --rotate180 -o rotate180.jpg
@@ -2123,7 +2343,12 @@ current top image.
 
     Replace the current image with a new image that is rotated 270 degrees
     clockwise (or 90 degrees counter-clockwise).
-    
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         oiiotool grid.jpg --rotate270 -o rotate270.jpg
@@ -2140,7 +2365,12 @@ current top image.
 
     Replace the current image with a new image that is flipped vertically,
     with the top scanline becoming the bottom, and vice versa.
-    
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         oiiotool grid.jpg --flip -o flip.jpg
@@ -2156,7 +2386,12 @@ current top image.
 
     Replace the current image with a new image that is flopped horizontally,
     with the leftmost column becoming the rightmost, and vice versa.
-    
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         oiiotool grid.jpg --flop -o flop.jpg
@@ -2185,6 +2420,11 @@ current top image.
     Replace the current image with a new image that is reflected about
     the x-y axis (x and y coordinates and sizes are swapped).
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
 
         oiiotool grid.jpg --transpose -o transpose.jpg
@@ -2204,6 +2444,11 @@ current top image.
     pixels vertically.  *Circular* shifting means that the pixels wrap to
     the other side as they shift.
     
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
     
         oiiotool grid.jpg --cshift +70+30 -o cshift.jpg
@@ -2315,13 +2560,15 @@ current top image.
     if `width` or `height` is 0, that dimension will be automatically
     computed so as to preserve the original aspect ratio.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-    - `interp=` *bool* : If set to zero, it will just copy the "closest"
-      pixel; if nonzero, bilinear interpolation of the surrounding 4 pixels
-      will be used.
-    
-    
+      `interp=` *bool*
+        If set to zero, it will just copy the "closest" pixel; if nonzero,
+        bilinear interpolation of the surrounding 4 pixels will be used.
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Examples (suppose that the original image is 640x480)::
     
         --resample 1024x768         # new resolution w=1024, h=768
@@ -2346,11 +2593,15 @@ current top image.
     if `width` or `height` is 0, that dimension will be
     automatically computed so as to preserve the original aspect ratio.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-    - `filter=` *name* : Filter name. The default is `blackman-harris` when
-      increasing resolution, `lanczos3` when decreasing resolution.
-    
+      `filter=` *name*
+        Filter name. The default is `blackman-harris` when increasing
+        resolution, `lanczos3` when decreasing resolution.
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Examples (suppose that the original image is 640x480)::
     
         --resize 1024x768         # new resolution w=1024, h=768
@@ -2370,7 +2621,7 @@ current top image.
 
             *width* x *height* [+-] *xoffset* [+-] *yoffset*
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `filter=` *name* : Filter name. The default is `blackman-harris` when
       increasing resolution, `lanczos3` when decreasing resolution.
@@ -2405,7 +2656,7 @@ current top image.
     `--pixelaspect 2.0` will result in a 512x1024 image that has
     "PixelAspectRatio" metadata set to 2.0.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
       - `filter=` *name* : Filter name. The default is `lanczos3`.
 
@@ -2422,12 +2673,20 @@ current top image.
     the exact center of the display window (a.k.a. "full" image), but can be
     explicitly set with the optional `center=x,y` option.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-    - `center=` *x,y* : Alternate center of rotation.
-    - `filter=` *name* : Filter name. The default is `lanczos3`.
-    - `recompute_roi=` *val* & If nonzero, recompute the pixel data window
-      to exactly hold the transformed image (default=0).
+      `center=` *x,y*
+        Alternate center of rotation.
+
+      `filter=` *name*
+        Filter name. The default is `lanczos3`.
+
+      `recompute_roi=` *val*
+        If nonzero, recompute the pixel data window to exactly hold the
+        transformed image (default=0).
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2447,11 +2706,17 @@ current top image.
     3x3 matrix (presented as a comma-separated list of values, without
     any spaces).
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-    - `filter=` *name* : Filter name. The default is `lanczos3`.
-    - `recompute_roi=` *val* & If nonzero, recompute the pixel data window to
-      exactly hold the transformed image (default=0).
+      `filter=` *name*
+        Filter name. The default is `lanczos3`.
+
+      `recompute_roi=` *val*
+        If nonzero, recompute the pixel data window to exactly hold the
+        transformed image (default=0).
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2462,6 +2727,11 @@ current top image.
 
     Use the top image as a kernel to convolve the next image farther down
     the stack, replacing both with the result.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2477,9 +2747,13 @@ current top image.
     Blur the top image with a blur kernel of the given size expressed as *width*
     x *height*.  (The sizes may be floating point numbers.)
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-    - `kernel=` *name* : Kernel name. The default is `gaussian`.
+      `kernel=` *name*
+        Kernel name. The default is `gaussian`.
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2506,6 +2780,11 @@ current top image.
     expressed as *width* x *height*.  (The sizes are integers.) This helps
     to eliminate noise and other unwanted high-frequency detail, but without
     blurring long edges the way a `--blur` command would.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2537,6 +2816,11 @@ current top image.
     small isolated dark spots. Erosion takes the minimum of pixel values
     inside the window, and makes dark features wider, bright features
     thinner, and removes small isolated bright spots.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2582,6 +2866,11 @@ current top image.
 
     Calculates the Laplacian of the top image.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Examples::
 
         oiiotool tahoe.jpg --laplacian tahoe-laplacian.exr
@@ -2604,15 +2893,20 @@ current top image.
 
     Unblur the top image using an "unsharp mask.""
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
     
-    - `kernel=` *name* : Name of the blur kernel (default: `gaussian`). If
-      the kernel name is `median`, the unsarp mask algorithm will use a
-      median filter rather than a blurring filter in order to compute the
-      low-frequency image.
-    - `width=` *w* : Width of the blur kernel (default: 3).
-    - `contrast=` *c* : Contrast scale (default: 1.0)
-    - `threshold=` *t* : Threshold for applying the difference (default: 0)
+      `kernel=` *name*
+        Name of the blur kernel (default: `gaussian`). If the kernel name is
+        `median`, the unsarp mask algorithm will use a median filter rather
+        than a blurring filter in order to compute the low-frequency image.
+      `width=` *w*
+        Width of the blur kernel (default: 3).
+      `contrast=` *c*
+        Contrast scale (default: 1.0)
+      `threshold=` *t*
+        Threshold for applying the difference (default: 0)
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2638,6 +2932,11 @@ current top image.
     and results in a single channel result (with the real component only of
     the spatial domain result).
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Examples::
 
         # Select the blue channel and take its DCT
@@ -2661,6 +2960,11 @@ current top image.
     
     The `unpolar` performs the reverse transformation, converting from polar
     values (amplitude and phase) to complex (real and imaginary).
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Examples::
 
@@ -2698,6 +3002,11 @@ current top image.
     comma-separated constant values (with no spaces) may be used to specifiy
     a different value to add to each channel in the image.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Examples:
 
         oiiotool imageA.tif imageB.tif --min -o minimum.tif
@@ -2712,7 +3021,7 @@ current top image.
     Replace the top image with a copy in which pixel values have been
     clamped.  Optional arguments include:
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `min=` *val* : Specify a minimum value for all channels.
     - `min=` *val0,val1,...* : Specify minimum value for each channel
@@ -2753,9 +3062,13 @@ current top image.
     done using the luminance and applied equally to all color channels. This
     can help to preserve color even when remapping intensity.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-    - `luma=` *val* : *val* is 0, turns off the luma behavior.
+      `luma=` *val*
+        *val* is 0, turns off the luma behavior.
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
     Range compression and expansion can be useful in cases where high
     contrast super-white (> 1) pixels (such as very bright highlights in HDR
@@ -2780,9 +3093,12 @@ current top image.
     Draw (rasterize) an open polyline connecting the list of pixel
     positions, as a comma-separated list of alternating *x* and *y* values.
     Additional optional arguments include:
-    
-    - `color=` *r,g,b,...* : specify the color of the line
-    
+
+      `color=` *r,g,b,...*
+        specify the color of the line
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     The default color, if not supplied, is opaque white.
 
     Examples::
@@ -2799,9 +3115,13 @@ current top image.
     Draw (rasterize) a filled or unfilled a box with opposite corners
     `(x1,y1)` and `(x2,y2)`. Additional optional arguments include:
     
-    - `color=` *r,g,b,...* : specify the color of the lines
-    - `fill=` *bool* : if nonzero, fill in the box
-    
+      `color=` *r,g,b,...*
+        specify the color of the lines
+      `fill=` *bool*
+        if nonzero, fill in the box
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     The default color, if not supplied, is opaque white.
 
     Examples::
@@ -2820,26 +3140,35 @@ current top image.
     be a constant color, vertical gradient, horizontal gradient, or
     four-corner gradient.
     
-    Optional arguments for constant color:
+    Optional modifiers for constant color:
 
-     - `color=` *r,g,b,...* : the color of the constant
+       `color=` *r,g,b,...*
+         the color of the constant
     
-    Optional arguments for vertical gradient:
+    Optional modifiers for vertical gradient:
 
-     - `top=` *r,g,b,...*    : the color for the top edge of the region
-     - `bottom=` *r,g,b,...* : the color for the bottom edge of the region
+       `top=` *r,g,b,...*
+         the color for the top edge of the region
+       `bottom=` *r,g,b,...*
+         the color for the bottom edge of the region
     
-    Optional arguments for horizontal gradient:
+    Optional modifiers for horizontal gradient:
 
-     - `left=` *r,g,b,...*  : the color for the left edge of the region
-     - `right=` *r,g,b,...* : the color for the right edge of the region
+       `left=` *r,g,b,...*
+         the color for the left edge of the region
+       `right=` *r,g,b,...*
+         the color for the right edge of the region
     
-    Optional arguments for 4-corner gradient:
+    Optional modifiers for 4-corner gradient:
 
-     - `topleft=` *r,g,b,...*     : the color for the top left corner of the region
-     - `topright=` *r,g,b,...*    : the color for the top right corner of the region
-     - `bottomleft=` *r,g,b,...*  : the color for the bottom left corner of the region
-     - `bottomright=` *r,g,b,...* : the color for the bottom right corner of the region
+       `topleft=` *r,g,b,...*
+         the color for the top left corner of the region
+       `topright=` *r,g,b,...*
+         the color for the top right corner of the region
+       `bottomleft=` *r,g,b,...*
+         the color for the bottom left corner of the region
+       `bottomright=` *r,g,b,...*
+         the color for the bottom right corner of the region
 
     Examples::
 
@@ -2869,20 +3198,32 @@ current top image.
 .. option:: --text <words>
 
     Draw (rasterize) text overtop of the current image.
-    
-    - `x=` *xpos* & *x* position (in pixel coordinates) of the text
-    - `y=` *ypos* & *y* position (in pixel coordinates) of the text
-    - `size=` *size* & font size (height, in pixels)
-    - `font=` *name* & font name, full path to the font file on disk (use
-      double quotes `"name"` if the path name includes spaces)
-    - `color=` *r,g,b,...* : specify the color of the text
-    - `xalign=` *val* & controls horizontal text alignment: `left`
-      (default), `right`, `center`.
-    - `yalign=` *val* & controls vertical text alignment: `base` (default),
-      `top`, `bottom`, `center`.
-    - `shadow=` *size* & if nonzero, will make a dark shadow halo to make
-      the text more clear on bright backgrounds.
-    
+
+    Optional appended modifiers include:
+
+      `x=` *xpos*
+        *x* position (in pixel coordinates) of the text
+      `y=` *ypos*
+        *y* position (in pixel coordinates) of the text
+      `size=` *size*
+        font size (height, in pixels)
+      `font=` *name*
+        font name, full path to the font file on disk (use double quotes
+        `"name"` if the path name includes spaces)
+      `color=` *r,g,b,...*
+        specify the color of the text
+      `xalign=` *val*
+        controls horizontal text alignment: `left` (default), `right`,
+        `center`.
+      `yalign=` *val*
+        controls vertical text alignment: `base` (default), `top`, `bottom`,
+        `center`.
+      `shadow=` *size*
+        if nonzero, will make a dark shadow halo to make the text more clear
+        on bright backgrounds.
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     The default positions the text starting at the center of the image,
     drawn 16 pixels high in opaque white in all channels (1,1,1,...), and
     using a default font (which may be system dependent).
@@ -2954,7 +3295,7 @@ bottom you will see the list of all color spaces, looks, and displays that
     Replace the current image with a new image whose pixels are transformed
     from the named *fromspace* color space into the named *tospace*
     (disregarding any notion it may have previously had about the color
-    space of the current image). Optional appended arguments include:
+    space of the current image). Optional appended modifiers include:
 
     - `key=` *name*, `value=` *str* :
 
@@ -2977,12 +3318,20 @@ bottom you will see the list of all color spaces, looks, and displays that
       transformation will just print a warning and simply copy the image
       without changing colors.
 
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 .. option:: --tocolorspace <tospace>
 
     Replace the current image with a new image whose pixels are transformed
     from their existing color space (as best understood or guessed by OIIO)
     into the named *tospace*.  This is equivalent to a use of
     `oiiotool --colorconvert` where the *fromspace* is automatically deduced.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
 .. option:: --ccmatrix <m00,m01,...>
 
@@ -2998,7 +3347,7 @@ bottom you will see the list of all color spaces, looks, and displays that
     etc. This means that colors are treated as "row vectors" that are
     post-multiplied by the matrix (`C*M`).
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
     - `unpremult=` *val* :
 
@@ -3018,7 +3367,10 @@ bottom you will see the list of all color spaces, looks, and displays that
       If nonzero, this will cause the matrix to be transposed (this allowing
       you to more easily specify it as if the color values were column
       vectors and the transformation as `M*C`).
-    
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     Example::
 
       # Convert ACES to ACEScg using a matrix
@@ -3061,6 +3413,9 @@ bottom you will see the list of all color spaces, looks, and displays that
       0, meaning the color transformation not will be automatically
       bracketed by divide-by-alpha / mult-by-alpha operations.
     
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     This command is only meaningful if OIIO was compiled with OCIO support
     and the environment variable `$OCIO` is set to point to a valid
     OpenColorIO configuration file.  If you ask for :program:`oiiotool` help
@@ -3073,34 +3428,36 @@ bottom you will see the list of all color spaces, looks, and displays that
 
 
 
-.. option:: --ociodisplay <displayname viewname>
+.. option:: --ociodisplay <displayname> <viewname>
 
     Replace the current image with a new image whose pixels are transformed
     using the named OpenColorIO "display" transformation given by the
     *displayname* and *viewname*.  An empty string for *displayname*
     means to use the default display, and an empty string for *viewname*
-    means to use the default view on that display. Optional appended
-    arguments include:
-    
-    - `from=` *val* & Assume the image is in the named color
-      space. If no `from=` is supplied, it will try to deduce it
-      from the image's metadata or previous `--iscolorspace`
-      directives.
+    means to use the default view on that display.
 
-    - `key=` *name*, `value=` *str*
-
-      Adds a key/value pair to the "context" that OpenColorIO will used
-      when applying the look. Multiple key/value pairs may be specified by
-      making each one a comma-separated list.
-
-    - `unpremult=` *val* :
+    Optional appended modifiers include:
     
-      If the numeric *val* is nonzero, the pixel values will be
-      "un-premultipled" (divided by alpha) prior to the actual color
-      conversion, and then re-multipled by alpha afterwards. The default is
-      0, meaning the color transformation not will be automatically
-      bracketed by divide-by-alpha / mult-by-alpha operations.
+      `from=` *val*
+        Assume the image is in the named color space. If no `from=` is
+        supplied, it will try to deduce it from the image's metadata or
+        previous `--iscolorspace` directives.
     
+      `key=` *name*, `value=` *str*
+        Adds a key/value pair to the "context" that OpenColorIO will used
+        when applying the look. Multiple key/value pairs may be specified by
+        making each one a comma-separated list.
+    
+      `unpremult=` *val* :
+        If the numeric *val* is nonzero, the pixel values will be
+        "un-premultipled" (divided by alpha) prior to the actual color
+        conversion, and then re-multipled by alpha afterwards. The default
+        is 0, meaning the color transformation not will be automatically
+        bracketed by divide-by-alpha / mult-by-alpha operations.
+    
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     This command is only meaningful if OIIO was compiled with OCIO support
     and the environment variable `$OCIO` is set to point to a valid
     OpenColorIO configuration file.  If you ask for :program:`oiiotool` help
@@ -3130,6 +3487,9 @@ bottom you will see the list of all color spaces, looks, and displays that
       0, meaning the color transformation not will be automatically
       bracketed by divide-by-alpha / mult-by-alpha operations.
 
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
     This command is only meaningful if OIIO was compiled with OCIO support
     and the environment variable `$OCIO` is set to point to a valid
     OpenColorIO configuration file.  If you ask for :program:`oiiotool` help
@@ -3149,12 +3509,21 @@ bottom you will see the list of all color spaces, looks, and displays that
     undefined in that case).  This is a no-op if there is no identified
     alpha channel.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 .. option:: --premult
 
     Multiply all color channels (those not alpha or z) of the current image
     by the alpha value, to "premultiply'' them.  This presumes that the
     image starts of as "unassociated alpha,'' a.k.a. "non-premultipled."
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
 
 |
@@ -3178,16 +3547,24 @@ Commands specific to deep images
     $z$ value indicating an infinite distance, will result in a pixel with
     no depth samples.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
 
-      - `z=` *val* : The depth to use for deep samples if the source
-        image did not have a "Z" channel. (The default is 1.0.)
+      `z=` *val*
+        The depth to use for deep samples if the source image did not have a
+        "Z" channel. (The default is 1.0.)
 
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
 .. option:: --flatten
 
     If the top image is "deep," then "flatten" it by compositing the depth
     samples in each pixel.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
 .. option:: --deepmerge
 
@@ -3196,12 +3573,22 @@ Commands specific to deep images
     same number and order of channels and must contain an alpha channel and
     depth channel.
 
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
+
 .. option:: --deepholdout
 
     Replace the *two* top images with a new deep image that is the ``deep
     holdout'' of the first image by the second --- that is, the samples from
     the first image that are closer than the opaque frontier of the second
     image. Both input inputs must be deep images.
+
+    Optional appended modifiers include:
+
+      `:subimages=` *indices-or-names*
+        Include/exclude subimages (see :ref:`sec-oiiotool-subimage-modifier`).
 
 |
 
@@ -3249,7 +3636,7 @@ General commands that also work for deep images
 
     Print to the console detailed information about the values in every pixel.
 
-    Optional appended arguments include:
+    Optional appended modifiers include:
     
     - `empty=` *val* :  If 0, will cause deep images to skip printing of
       information about pixels with no samples, and cause non-deep images to

@@ -3,16 +3,16 @@
 # https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
 
 cmake_minimum_required (VERSION 3.12)
-project (OpenImageIO VERSION 2.2.1.1
+project (OpenImageIO VERSION 2.2.7.0
          HOMEPAGE_URL "https://openimageio.org"
          LANGUAGES CXX C)
 set (PROJ_NAME OIIO)    # short name, caps
 string (TOLOWER ${PROJ_NAME} PROJ_NAME_LOWER)  # short name lower case
 string (TOUPPER ${PROJ_NAME} PROJ_NAME_UPPER)  # short name upper case
-set (PROJECT_VERSION_RELEASE_TYPE "dev")   # "dev", "betaX", "RCY", ""
+set (PROJECT_VERSION_RELEASE_TYPE "")   # "dev", "betaX", "RCY", ""
 set (${PROJECT_NAME}_VERSION_RELEASE_TYPE ${PROJECT_VERSION_RELEASE_TYPE})
 set (PROJECT_AUTHORS "Contributors to the OpenImageIO project")
-set (${PROJECT_NAME}_SUPPORTED_RELEASE 0)  # Change to 1 after release branch
+set (${PROJECT_NAME}_SUPPORTED_RELEASE 1)  # Change to 1 after release branch
 
 # If the user wants to use Conan to build dependencies, they will have done
 # this prior to the cmake config:
@@ -43,13 +43,13 @@ message (STATUS "Configuration types    = ${CMAKE_CONFIGURATION_TYPES}")
 message (STATUS "Build type             = ${CMAKE_BUILD_TYPE}")
 
 # Make the build area layout look a bit more like the final dist layout
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 if ("${PROJECT_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
     message (FATAL_ERROR "Not allowed to run in-source build!")
 endif ()
-
 
 option (CMAKE_USE_FOLDERS "Use the FOLDER target property to organize targets into folders." ON)
 mark_as_advanced (CMAKE_USE_FOLDERS)
@@ -70,6 +70,7 @@ option (INSTALL_FONTS "If ON, install default fonts" OFF)
 option (INSTALL_CMAKE_HELPER "If On, install FindOpenImageIO.cmake" ON)
 option (EMBEDPLUGINS "Embed format plugins in libOpenImageIO" ON)
 set (PLUGIN_SEARCH_PATH "" CACHE STRING "Default plugin search path")
+file (TO_NATIVE_PATH "${PLUGIN_SEARCH_PATH}" PLUGIN_SEARCH_PATH_NATIVE)
 set (CMAKE_DEBUG_POSTFIX "" CACHE STRING "Library naming postfix for Debug builds (e.g., '_debug')")
 
 set(OIIO_TESTSUITE_IMAGEDIR "${PROJECT_SOURCE_DIR}/.." CACHE PATH
@@ -105,6 +106,7 @@ include (GNUInstallDirs)
 
 include (colors)
 include (check_is_enabled)
+include (checked_find_package)
 
 # All the C++ and compiler related options and adjustments live here
 include (compiler)
@@ -127,12 +129,13 @@ include_directories (
     "${CMAKE_SOURCE_DIR}/src/include"
     "${CMAKE_BINARY_DIR}/src/include"
     "${CMAKE_BINARY_DIR}/include"
+    "${CMAKE_BINARY_DIR}/include/OpenImageIO"
   )
 
 # Tell CMake to process the sub-directories
 add_subdirectory (src/libutil)
 
-find_or_download_robin_map ()
+#find_or_download_robin_map ()
 
 
 # Add IO plugin directories -- if we are embedding plugins, we need to visit
@@ -183,7 +186,6 @@ if (NOT EMBEDPLUGINS AND NOT BUILD_OIIOUTIL_ONLY)
 endif ()
 
 if (USE_PYTHON AND NOT BUILD_OIIOUTIL_ONLY)
-    find_or_download_pybind11 ()
     add_subdirectory (src/python)
 endif ()
 
@@ -290,8 +292,6 @@ add_custom_command (OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/testsuite/runtest.py"
                     MAIN_DEPENDENCY "${CMAKE_CURRENT_SOURCE_DIR}/testsuite/runtest.py")
 add_custom_target ( CopyFiles ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/testsuite/runtest.py" )
 
-# Basic tests that apply even to continuous integration tests:
-
 #   Tests that require oiio-images:
 oiio_add_tests (gpsread
                 oiiotool oiiotool-attribs  oiiotool-copy
@@ -300,7 +300,6 @@ oiio_add_tests (gpsread
                 maketx oiiotool-maketx
                 misnamed-file
                 missingcolor
-                dpx ico iff png psd rla sgi zfile
                 texture-interp-bicubic
                 texture-blurtube
                 texture-crop texture-cropover
@@ -313,12 +312,7 @@ oiio_add_tests (gpsread
                 texture-fat texture-skinny texture-wrapfill
                 texture-missing texture-res texture-maxres
                 texture-udim texture-udim2
-                IMAGEDIR oiio-images
-               )
-
-#   Tests that require openexr-images:
-oiio_add_tests (oiiotool-deep
-                IMAGEDIR openexr-images
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images"
                )
 
 #   Remaining freestanding tests:
@@ -329,7 +323,7 @@ oiio_add_tests (nonwhole-tiles
                 diff
                 dither dup-channels
                 jpeg-corrupt
-                null psd-colormodes
+                null
                 rational
                )
 
@@ -357,10 +351,8 @@ if (USE_PYTHON AND NOT BUILD_OIIOUTIL_ONLY AND NOT SANITIZE_ON_LINUX)
             )
 endif ()
 
-# Add tests that require OCIO
-if (OPENCOLORIO_FOUND)
-    oiio_add_tests (oiiotool-color)
-endif ()
+oiio_add_tests (oiiotool-color
+                FOUNDVAR OPENCOLORIO_FOUND)
 
 # Advanced tests that are done by hand and for releases:
 # FIXME -- at some point, try to fix these or provide new ref images
@@ -376,65 +368,83 @@ if (NOT DEFINED ENV{TRAVIS} AND NOT DEFINED ENV{CIRCLECI} AND NOT DEFINED ENV{GI
     oiio_add_tests (texture-icwrite)
 endif ()
 
-# List testsuites which need special external reference images from the web
-# here:
+# List testsuites for specific formats or features which might be not found
+# or be intentionally disabled, or which need special external reference
+# images from the web that if not found, should skip the tests:
+
 oiio_add_tests (bmp
-    IMAGEDIR bmpsuite
-    URL http://entropymine.com/jason/bmpsuite/bmpsuite.zip)
-
-oiio_add_tests (tiff-suite tiff-depths tiff-misc
-    IMAGEDIR libtiffpic
-    URL http://www.simplesystems.org/libtiff/images.html)
-
-oiio_add_tests (openexr-suite openexr-multires openexr-chroma openexr-v2 perchannel
-    IMAGEDIR openexr-images
-    URL http://www.openexr.com/downloads.html)
-
-oiio_add_tests (gif
-    FOUNDVAR GIF_FOUND
-    IMAGEDIR oiio-images
-    URL "Recent checkout of oiio-images")
-
-oiio_add_tests (jpeg2000
-    FOUNDVAR OPENJPEG_FOUND
-    IMAGEDIR j2kp4files_v1_5
-    URL http://www.itu.int/net/ITU-T/sigdb/speimage/ImageForm-s.aspx?val=10100803)
-
-oiio_add_tests (pnm
-    IMAGEDIR oiio-images/pnm
-    URL "Recent checkout of oiio-images")
-
-oiio_add_tests (raw
-    FOUNDVAR LIBRAW_FOUND
-    IMAGEDIR oiio-images/raw
-    URL "Recent checkout of oiio-images")
-
-oiio_add_tests (targa-tgautils
-    IMAGEDIR TGAUTILS
-    URL http://tgautils.inequation.org/)
-
+                ENABLEVAR ENABLE_BMP
+                IMAGEDIR bmpsuite
+                URL http://entropymine.com/jason/bmpsuite/bmpsuite.zip)
+oiio_add_tests (dpx
+                ENABLEVAR ENABLE_DPX
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (field3d texture-field3d
+                FOUNDVAR Field3D_FOUND ENABLEVAR ENABLE_FIELD3D)
 oiio_add_tests (fits
-    IMAGEDIR fits-images
-    URL http://www.cv.nrao.edu/fits/data/tests/)
-
+                ENABLEVAR ENABLE_FITS
+                IMAGEDIR fits-images
+                URL http://www.cv.nrao.edu/fits/data/tests/)
+oiio_add_tests (gif
+                FOUNDVAR GIF_FOUND ENABLEVAR ENABLE_GIF
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
 oiio_add_tests (heif
-    FOUNDVAR LIBHEIF_FOUND
-    URL https://github.com/nokiatech/heif/tree/gh-pages/content)
-
-oiio_add_tests (webp
-    FOUNDVAR WEBP_FOUND
-    IMAGEDIR oiio-images/webp
-    URL "Recent checkout of oiio-images")
-
-oiio_add_tests (ptex
-    FOUNDVAR PTEX_FOUND)
-
-oiio_add_tests (texture-field3d field3d
-    FOUNDVAR FIELD3D_FOUND)
-
-
+                FOUNDVAR Libheif_FOUND ENABLEVAR ENABLE_Libheif
+                URL https://github.com/nokiatech/heif/tree/gh-pages/content)
+oiio_add_tests (ico
+                ENABLEVAR ENABLE_ICO
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (iff
+                ENABLEVAR ENABLE_IFF
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (jpeg2000
+                FOUNDVAR OPENJPEG_FOUND
+                IMAGEDIR j2kp4files_v1_5
+                URL http://www.itu.int/net/ITU-T/sigdb/speimage/ImageForm-s.aspx?val=10100803)
+oiio_add_tests (openexr-suite openexr-multires openexr-chroma
+                openexr-v2 openexr-window perchannel
+                oiiotool-deep
+                IMAGEDIR openexr-images
+                URL http://www.openexr.com/downloads.html)
+if (NOT DEFINED ENV{TRAVIS} AND NOT DEFINED ENV{CIRCLECI} AND NOT DEFINED ENV{GITHUB_ACTIONS})
+    oiio_add_tests (openexr-damaged
+                    IMAGEDIR openexr-images
+                    URL http://www.openexr.com/downloads.html)
+endif ()
 oiio_add_tests (openvdb
-    FOUNDVAR OPENVDB_FOUND)
+                FOUNDVAR OpenVDB_FOUND ENABLEVAR ENABLE_OpenVDB)
+oiio_add_tests (png
+                ENABLEVAR ENABLE_PNG
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (pnm
+                ENABLEVAR ENABLE_PNM
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (psd psd-colormodes
+                ENABLEVAR ENABLE_PSD
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (ptex
+                FOUNDVAR PTEX_FOUND ENABLEVAR ENABLE_PTEX)
+oiio_add_tests (raw
+                FOUNDVAR LIBRAW_FOUND ENABLEVAR ENABLE_LIBRAW
+                IMAGEDIR oiio-images/raw
+                URL "Recent checkout of oiio-images")
+oiio_add_tests (rla
+                ENABLEVAR ENABLE_RLA
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (sgi
+                ENABLEVAR ENABLE_SGI
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (targa-tgautils
+                ENABLEVAR ENABLE_TARGA
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
+oiio_add_tests (tiff-suite tiff-depths tiff-misc
+                IMAGEDIR libtiffpic
+                URL http://www.simplesystems.org/libtiff/images.html)
+oiio_add_tests (webp
+                FOUNDVAR Webp_FOUND ENABLEVAR ENABLE_Webp
+                IMAGEDIR oiio-images/webp URL "Recent checkout of oiio-images")
+oiio_add_tests (zfile ENABLEVAR ENABLE_ZFILE
+                IMAGEDIR oiio-images URL "Recent checkout of oiio-images")
 
 if (SPI_TESTS)
   oiio_add_tests (oiiotool-spi
@@ -443,7 +453,6 @@ if (SPI_TESTS)
     URL "noplace -- it's SPI specific tests")
 endif ()
 endif()
-
 
 #########################################################################
 # Packaging
@@ -490,7 +499,7 @@ set (CPACK_COMPONENT_USER_DISPLAY_NAME "Applications")
 set (CPACK_COMPONENT_DEVELOPER_DISPLAY_NAME "Developer files")
 set (CPACK_COMPONENT_DOCUMENTATION_DISPLAY_NAME "Documentation")
 set (CPACK_COMPONENT_USER_DESCRIPTION
-     "Applications: oiotool, iv, iinfo, iconvert, idiff, igrep, maketx and libraries")
+     "Applications: oiiotool, iv, iinfo, iconvert, idiff, igrep, maketx and libraries")
 set (CPACK_COMPONENT_DEVELOPER_DESCRIPTION "Include files")
 set (CPACK_COMPONENT_DOCUMENTATION_DESCRIPTION "OpenImageIO documentation")
 set (CPACK_COMPONENT_DEVELOPER_DEPENDS user)

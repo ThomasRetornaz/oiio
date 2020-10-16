@@ -6,8 +6,8 @@
 #include <iostream>
 #include <memory>
 
-#include <IlmBase/Imath/ImathFun.h>
-#include <IlmBase/Half/half.h>
+#include <ImathFun.h>
+#include <half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/deepdata.h>
@@ -106,9 +106,9 @@ public:
     void copy_metadata(const ImageBufImpl& src);
 
     template<typename... Args>
-    void error(const char* fmt, const Args&... args) const
+    void errorfmt(const char* fmt, const Args&... args) const
     {
-        error(Strutil::sprintf(fmt, args...));
+        error(Strutil::fmt::format(fmt, args...));
     }
 
     template<typename... Args>
@@ -932,12 +932,12 @@ ImageBufImpl::read(int subimage, int miplevel, int chbegin, int chend,
         auto input = ImageInput::open(m_name.string(), m_configspec.get(),
                                       m_rioproxy);
         if (!input) {
-            errorf("%s", OIIO::geterror());
+            error(OIIO::geterror());
             return false;
         }
         input->threads(threads());  // Pass on our thread policy
         if (!input->read_native_deep_image(subimage, miplevel, m_deepdata)) {
-            errorf("%s", input->geterror());
+            error(input->geterror());
             return false;
         }
         m_spec         = m_nativespec;  // Deep images always use native data
@@ -1044,11 +1044,11 @@ ImageBufImpl::read(int subimage, int miplevel, int chbegin, int chend,
                 m_pixels_valid = true;
             } else {
                 m_pixels_valid = false;
-                errorf("%s", in->geterror());
+                error(in->geterror());
             }
         } else {
             m_pixels_valid = false;
-            errorf("%s", OIIO::geterror());
+            error(OIIO::geterror());
         }
         return m_pixels_valid;
     }
@@ -1063,7 +1063,7 @@ ImageBufImpl::read(int subimage, int miplevel, int chbegin, int chend,
         m_pixels_valid = true;
     } else {
         m_pixels_valid = false;
-        errorf("%s", m_imagecache->geterror());
+        error(m_imagecache->geterror());
     }
 
     return m_pixels_valid;
@@ -1132,6 +1132,10 @@ bool
 ImageBuf::write(ImageOutput* out, ProgressCallback progress_callback,
                 void* progress_callback_data) const
 {
+    if (!out) {
+        error("Empty ImageOutput passed to ImageBuf::write()");
+        return false;
+    }
     stride_t as = AutoStride;
     bool ok     = true;
     ok &= m_impl->validate_pixels();
@@ -1214,7 +1218,7 @@ ImageBuf::write(ImageOutput* out, ProgressCallback progress_callback,
         }
     }
     if (!ok)
-        errorf("%s", out->geterror());
+        error(out->geterror());
     return ok;
 }
 
@@ -1259,7 +1263,7 @@ ImageBuf::write(string_view _filename, TypeDesc dtype, string_view _fileformat,
 
     auto out = ImageOutput::create(fileformat);
     if (!out) {
-        errorf("%s", geterror());
+        error(geterror());
         return false;
     }
     out->threads(threads());  // Pass on our thread policy
@@ -1311,7 +1315,7 @@ ImageBuf::write(string_view _filename, TypeDesc dtype, string_view _fileformat,
     }
 
     if (!out->open(filename.c_str(), newspec)) {
-        errorf("%s", out->geterror());
+        error(out->geterror());
         return false;
     }
     if (!write(out.get(), progress_callback, progress_callback_data))
@@ -1325,13 +1329,21 @@ ImageBuf::write(string_view _filename, TypeDesc dtype, string_view _fileformat,
 
 
 bool
-ImageBuf::make_writeable(bool keep_cache_type)
+ImageBuf::make_writable(bool keep_cache_type)
 {
     if (storage() == IMAGECACHE) {
         return read(subimage(), miplevel(), 0, -1, true /*force*/,
                     keep_cache_type ? m_impl->m_cachedpixeltype : TypeDesc());
     }
     return true;
+}
+
+
+
+bool
+ImageBuf::make_writeable(bool keep_cache_type)
+{
+    return make_writable(keep_cache_type);
 }
 
 

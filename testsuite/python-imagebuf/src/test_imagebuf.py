@@ -55,15 +55,94 @@ def write (image, filename, format=oiio.UNKNOWN) :
 
 
 
+def test_perchannel_formats () :
+    # Test writing per-channel formats with an ImageBuf
+    b = oiio.ImageBuf(oiio.ImageSpec(2,2,4,"float"))
+    oiio.ImageBufAlgo.fill(b, (0.1, 0.2, 0.3, 0.4))
+    b.set_write_format (("half", "half", "half", "float"))
+    b.write ("perchan.exr")
+
+
+
+def test_deep () :
+    # Test write and read of deep data
+    # Let's try writing one
+    print ("\nWriting deep buffer...")
+    deepbufout_spec = oiio.ImageSpec (2, 2, 5, oiio.FLOAT)
+    deepbufout_spec.channelnames = ("R", "G", "B", "A", "Z")
+    deepbufout_spec.deep = True
+    deepbufout = oiio.ImageBuf(deepbufout_spec)
+    deepbufout.set_deep_samples (x=1, y=0, z=0, nsamples=2)
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=0, value=0.42)
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=4, sample=0, value=42.0)
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=1, value=0.47)
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=4, sample=1, value=43.0)
+    # Also insert some new samples
+    deepbufout.deep_insert_samples (x=1, y=0, z=0, samplepos=1, nsamples=2);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=1, value=1.1);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=1, sample=1, value=2.2);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=2, sample=1, value=2.3);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=1, value=1.0);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=1, value=42.25);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=2, value=0.1);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=1, sample=2, value=0.2);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=2, sample=2, value=0.3);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=2, value=1.0);
+    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=2, value=42.5);
+    # But delete the first one
+    deepbufout.deep_erase_samples (x=1, y=0, z=0, samplepos=1, nsamples=1);
+    # Save
+    deepbufout.write ("deepbuf.exr")
+    # And read it back
+    print ("\nReading back deep buffer:")
+    deepbufin = oiio.ImageBuf ("deepbuf.exr")
+    deepbufin_spec = deepbufin.spec()
+    dd = deepbufin.deepdata()
+    for p in range(dd.pixels) :
+        ns = dd.samples(p)
+        if ns > 1 :
+            print ("Pixel", p//deepbufin_spec.width, p%deepbufin_spec.width, "had", ns, "samples")
+            for s in range(ns) :
+                print ("Sample", s)
+                for c in range(dd.channels) :
+                    print ("\tc {0} : {1:.3f}".format(c, dd.deep_value(p,c,s)))
+
+
+
+# Test ability to write multiple subimages to a file.
+# Also tests ImageBuf.write(ImageOutput)
+def test_multiimage () :
+    print ("Writing multi-image file")
+    spec = oiio.ImageSpec (128, 64, 3, "float")
+    out = oiio.ImageOutput.create ("multipart.exr")
+    # Open with intent to write two subimages, each with same spec
+    if not out.open ("multipart.exr", (spec, spec)) :
+        print ("Error on initial open:", out.geterror())
+        return
+    img = oiio.ImageBufAlgo.fill ((0.5, 0.0, 0.0), spec.roi)
+    if not img.write (out) :
+        print ("Error on write:", img.geterror())
+        return
+    if not out.open ("multipart.exr", spec, "AppendSubimage") :
+        print ("Error on open for append:", out.geterror())
+        return
+    img = oiio.ImageBufAlgo.fill ((0.0, 0.5, 0.0), spec.roi)
+    if not img.write (out) :
+        print ("Error on write:", img.geterror())
+        return
+    out.close ()
+
+
+
 ######################################################################
 # main test starts here
 
 try:
 
-    print ("Constructing to be a writeable 320x240,4 UINT16:")
+    print ("Constructing to be a writable 320x240,4 UINT16:")
     b = oiio.ImageBuf (oiio.ImageSpec(320,240,4,oiio.UINT16))
     print_imagespec (b.spec())
-    print ("Resetting to be a writeable 640x480,3 Float:")
+    print ("Resetting to be a writable 640x480,3 Float:")
     b.reset (oiio.ImageSpec(640,480,3,oiio.FLOAT))
     print_imagespec (b.spec())
     print ("")
@@ -134,53 +213,9 @@ try:
                                    19660,32767,52428, 26214,32767,39321], dtype='H'))
     write (b, "outarrayH.tif", oiio.UINT16)
 
-    # Test writing per-channel formats with an ImageBuf
-    b = oiio.ImageBuf(oiio.ImageSpec(2,2,4,"float"))
-    oiio.ImageBufAlgo.fill(b, (0.1, 0.2, 0.3, 0.4))
-    b.set_write_format (("half", "half", "half", "float"))
-    b.write ("perchan.exr")
-
-    # Test write and read of deep data
-    # Let's try writing one
-    print ("\nWriting deep buffer...")
-    deepbufout_spec = oiio.ImageSpec (2, 2, 5, oiio.FLOAT)
-    deepbufout_spec.channelnames = ("R", "G", "B", "A", "Z")
-    deepbufout_spec.deep = True
-    deepbufout = oiio.ImageBuf(deepbufout_spec)
-    deepbufout.set_deep_samples (x=1, y=0, z=0, nsamples=2)
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=0, value=0.42)
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=4, sample=0, value=42.0)
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=1, value=0.47)
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=4, sample=1, value=43.0)
-    # Also insert some new samples
-    deepbufout.deep_insert_samples (x=1, y=0, z=0, samplepos=1, nsamples=2);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=1, value=1.1);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=1, sample=1, value=2.2);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=2, sample=1, value=2.3);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=1, value=1.0);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=1, value=42.25);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=0, sample=2, value=0.1);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=1, sample=2, value=0.2);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=2, sample=2, value=0.3);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=2, value=1.0);
-    deepbufout.set_deep_value (x=1, y=0, z=0, channel=3, sample=2, value=42.5);
-    # But delete the first one
-    deepbufout.deep_erase_samples (x=1, y=0, z=0, samplepos=1, nsamples=1);
-    # Save
-    deepbufout.write ("deepbuf.exr")
-    # And read it back
-    print ("\nReading back deep buffer:")
-    deepbufin = oiio.ImageBuf ("deepbuf.exr")
-    deepbufin_spec = deepbufin.spec()
-    dd = deepbufin.deepdata()
-    for p in range(dd.pixels) :
-        ns = dd.samples(p)
-        if ns > 1 :
-            print ("Pixel", p//deepbufin_spec.width, p%deepbufin_spec.width, "had", ns, "samples")
-            for s in range(ns) :
-                print ("Sample", s)
-                for c in range(dd.channels) :
-                    print ("\tc {0} : {1:.3f}".format(c, dd.deep_value(p,c,s)))
+    test_perchannel_formats ()
+    test_deep ()
+    test_multiimage ()
 
     print ("\nDone.")
 except Exception as detail:

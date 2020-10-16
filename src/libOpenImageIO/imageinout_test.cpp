@@ -27,29 +27,37 @@ make_test_image(string_view formatname)
     auto out = ImageOutput::create(formatname);
     OIIO_DASSERT(out);
     ImageSpec spec(64, 64, 4, TypeFloat);
+    float pval = 1.0f;
+    // Fill with 0 for lossy HEIF
+    if (formatname == "heif")
+        pval = 0.0f;
+
+    // Accommodate limited numbers of channels
     if (formatname == "zfile" || formatname == "fits")
         spec.nchannels = 1;  // these formats are single channel
     else if (!out->supports("alpha"))
-        spec.nchannels = 3;  // this channel doesn't support alpha
+        spec.nchannels = std::min(spec.nchannels, 3);
+
     // Force a fixed datetime metadata so it can't differ between writes
     // and make different file patterns for these tests.
     spec.attribute("DateTime", "01/01/2000 00:00:00");
+
     buf.reset(spec);
-    ImageBufAlgo::fill(buf, { 1.0f, 1.0f, 1.0f, 1.0f });
+    ImageBufAlgo::fill(buf, { pval, pval, pval, 1.0f });
     return buf;
 }
 
 
 
-#define CHECKED(obj, call)                                                     \
-    if (!obj->call) {                                                          \
-        if (do_asserts)                                                        \
-            OIIO_CHECK_ASSERT(false && #call);                                 \
-        if (errmsg)                                                            \
-            *errmsg = obj->geterror();                                         \
-        else                                                                   \
-            std::cout << "      " << obj->geterror() << "\n";                  \
-        return false;                                                          \
+#define CHECKED(obj, call)                                    \
+    if (!obj->call) {                                         \
+        if (do_asserts)                                       \
+            OIIO_CHECK_ASSERT(false && #call);                \
+        if (errmsg)                                           \
+            *errmsg = obj->geterror();                        \
+        else                                                  \
+            std::cout << "      " << obj->geterror() << "\n"; \
+        return false;                                         \
     }
 
 
@@ -206,9 +214,9 @@ test_read_proxy(string_view formatname, string_view extension,
 
 
 // Test writer's ability to detect and recover from errors when asked to
-// write an unwriteable file (such as in a nonexistent directory).
+// write an unwritable file (such as in a nonexistent directory).
 static bool
-test_write_unwriteable(string_view extension, const ImageBuf& buf)
+test_write_unwritable(string_view extension, const ImageBuf& buf)
 {
     bool ok = true;
     Sysutil::Term term(stdout);
@@ -245,7 +253,8 @@ test_all_formats()
         auto fmtexts           = Strutil::splitsv(e, ":");
         string_view formatname = fmtexts[0];
         // Skip "formats" that aren't amenable to this kind of testing
-        if (formatname == "null" || formatname == "socket")
+        if (formatname == "null" || formatname == "socket"
+            || formatname == "term")
             continue;
         // Field3d very finicky. Skip for now. FIXME?
         if (formatname == "field3d")
@@ -308,11 +317,11 @@ test_all_formats()
             test_read_proxy(formatname, extensions[0], filename, buf);
 
         //
-        // Test what happens when we write to an unwriteable or nonexistent
+        // Test what happens when we write to an unwritable or nonexistent
         // directory. It should not crash! But appropriately return some
         // error.
         //
-        test_write_unwriteable(extensions[0], buf);
+        test_write_unwritable(extensions[0], buf);
 
         Filesystem::remove(filename);
     }

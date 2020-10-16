@@ -22,22 +22,22 @@ using boost::math::gcd;
 
 #include <OpenImageIO/platform.h>
 
-#include <OpenEXR/IlmImf/ImfChannelList.h>
-#include <OpenEXR/IlmImf/ImfEnvmap.h>
-#include <OpenEXR/IlmImf/ImfInputFile.h>
-#include <OpenEXR/IlmImf/ImfTestFile.h>
-#include <OpenEXR/IlmImf/ImfTiledInputFile.h>
+#include <ImfChannelList.h>
+#include <ImfEnvmap.h>
+#include <ImfInputFile.h>
+#include <ImfTestFile.h>
+#include <ImfTiledInputFile.h>
 
 #ifdef OPENEXR_VERSION_MAJOR
-#    define OPENEXR_CODED_VERSION                                              \
-        (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100           \
+#    define OPENEXR_CODED_VERSION                                    \
+        (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100 \
          + OPENEXR_VERSION_PATCH)
 #else
 #    define OPENEXR_CODED_VERSION 20000
 #endif
 
-#if OPENEXR_CODED_VERSION >= 20400                                             \
-    || __has_include(<OpenEXR/ImfFloatVectorAttribute.h>)
+#if OPENEXR_CODED_VERSION >= 20400 \
+    || __has_include(<ImfFloatVectorAttribute.h>)
 #    define OPENEXR_HAS_FLOATVECTOR 1
 #else
 #    define OPENEXR_HAS_FLOATVECTOR 0
@@ -48,42 +48,41 @@ using boost::math::gcd;
 OIIO_PRAGMA_VISIBILITY_PUSH
 OIIO_PRAGMA_WARNING_PUSH
 OIIO_GCC_PRAGMA(GCC diagnostic ignored "-Wunused-parameter")
-#include <IlmBase/Iex/IexBaseExc.h>
-#include <IlmBase/Iex/IexThrowErrnoExc.h>
-#include <OpenEXR/IlmImf/ImfBoxAttribute.h>
-#include <OpenEXR/IlmImf/ImfChromaticitiesAttribute.h>
-#include <OpenEXR/IlmImf/ImfCompressionAttribute.h>
-#include <OpenEXR/IlmImf/ImfDeepFrameBuffer.h>
-#include <OpenEXR/IlmImf/ImfDeepScanLineInputPart.h>
-#include <OpenEXR/IlmImf/ImfDeepTiledInputPart.h>
-#include <OpenEXR/IlmImf/ImfDoubleAttribute.h>
-#include <OpenEXR/IlmImf/ImfEnvmapAttribute.h>
-#include <OpenEXR/IlmImf/ImfFloatAttribute.h>
+#include <IexBaseExc.h>
+#include <IexThrowErrnoExc.h>
+#include <ImfBoxAttribute.h>
+#include <ImfChromaticitiesAttribute.h>
+#include <ImfCompressionAttribute.h>
+#include <ImfDeepFrameBuffer.h>
+#include <ImfDeepScanLineInputPart.h>
+#include <ImfDeepTiledInputPart.h>
+#include <ImfDoubleAttribute.h>
+#include <ImfEnvmapAttribute.h>
+#include <ImfFloatAttribute.h>
 #if OPENEXR_HAS_FLOATVECTOR
-#    include <OpenEXR/IlmImf/ImfFloatVectorAttribute.h>
+#    include <ImfFloatVectorAttribute.h>
 #endif
-#include <OpenEXR/IlmImf/ImfInputPart.h>
-#include <OpenEXR/IlmImf/ImfIntAttribute.h>
-#include <OpenEXR/IlmImf/ImfKeyCodeAttribute.h>
-#include <OpenEXR/IlmImf/ImfMatrixAttribute.h>
-#include <OpenEXR/IlmImf/ImfMultiPartInputFile.h>
-#include <OpenEXR/IlmImf/ImfPartType.h>
-#include <OpenEXR/IlmImf/ImfRationalAttribute.h>
-#include <OpenEXR/IlmImf/ImfStringAttribute.h>
-#include <OpenEXR/IlmImf/ImfStringVectorAttribute.h>
-#include <OpenEXR/IlmImf/ImfTiledInputPart.h>
-#include <OpenEXR/IlmImf/ImfTimeCodeAttribute.h>
-#include <OpenEXR/IlmImf/ImfVecAttribute.h>
+#include <ImfInputPart.h>
+#include <ImfIntAttribute.h>
+#include <ImfKeyCodeAttribute.h>
+#include <ImfMatrixAttribute.h>
+#include <ImfMultiPartInputFile.h>
+#include <ImfPartType.h>
+#include <ImfRationalAttribute.h>
+#include <ImfStringAttribute.h>
+#include <ImfStringVectorAttribute.h>
+#include <ImfTiledInputPart.h>
+#include <ImfTimeCodeAttribute.h>
+#include <ImfVecAttribute.h>
 OIIO_PRAGMA_WARNING_POP
 OIIO_PRAGMA_VISIBILITY_POP
 
-#include <OpenEXR/IlmImf/ImfCRgbaFile.h>
+#include <ImfCRgbaFile.h>
 
 #include "imageio_pvt.h"
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/deepdata.h>
 #include <OpenImageIO/filesystem.h>
-#include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imagebufalgo_util.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/strutil.h>
@@ -311,8 +310,6 @@ private:
     {
         // Ones whose name we change to our convention
         m_map["cameraTransform"]  = "worldtocamera";
-        m_map["worldToCamera"]    = "worldtocamera";
-        m_map["worldToNDC"]       = "worldtoscreen";
         m_map["capDate"]          = "DateTime";
         m_map["comments"]         = "ImageDescription";
         m_map["owner"]            = "Copyright";
@@ -418,13 +415,15 @@ bool
 OpenEXRInput::open(const std::string& name, ImageSpec& newspec,
                    const ImageSpec& config)
 {
+    // First thing's first. See if we're been given an IOProxy. We have to
+    // do this before the check for non-exr files, that's why it's here and
+    // not where the rest of the configuration hints are handled.
     const ParamValue* param = config.find_attribute("oiio:ioproxy",
                                                     TypeDesc::PTR);
     if (param)
         m_io = param->get<Filesystem::IOProxy*>();
 
-    // Quick check to reject non-exr files. Don't perform these tests for
-    // the IOProxy case.
+    // Quick check to immediately reject nonexistant or non-exr files.
     if (!m_io && !Filesystem::is_regular(name)) {
         errorf("Could not open file \"%s\"", name);
         return false;
@@ -433,7 +432,8 @@ OpenEXRInput::open(const std::string& name, ImageSpec& newspec,
         errorf("\"%s\" is not an OpenEXR file", name);
         return false;
     }
-    pvt::set_exr_threads();
+
+    // Check any other configuration hints
 
     // "missingcolor" gives fill color for missing scanlines or tiles.
     if (const ParamValue* m = config.find_attribute("oiio:missingcolor")) {
@@ -456,8 +456,15 @@ OpenEXRInput::open(const std::string& name, ImageSpec& newspec,
             m_missingcolor = Strutil::extract_from_list_string<float>(mc);
     }
 
-    m_spec = ImageSpec();  // Clear everything with default constructor
+    // Before engaging further with OpenEXR, make sure it is using the right
+    // number of threads.
+    pvt::set_exr_threads();
 
+    // Clear the spec with default constructor
+    m_spec = ImageSpec();
+
+    // Establish an input stream. If we weren't given an IOProxy, create one
+    // now that just reads from the file.
     try {
         if (!m_io) {
             m_io = new Filesystem::IOFile(name, Filesystem::IOProxy::Read);
@@ -475,6 +482,8 @@ OpenEXRInput::open(const std::string& name, ImageSpec& newspec,
         return false;
     }
 
+    // Read the header by constructing a MultiPartInputFile from the input
+    // stream.
     try {
         m_input_multipart = new Imf::MultiPartInputFile(*m_input_stream);
     } catch (const std::exception& e) {
@@ -493,6 +502,8 @@ OpenEXRInput::open(const std::string& name, ImageSpec& newspec,
     m_subimage = -1;
     m_miplevel = -1;
 
+    // Set up for the first subimage ("part"). This will trigger reading
+    // information about all the parts.
     bool ok = seek_subimage(0, 0);
     if (ok)
         newspec = m_spec;
@@ -617,9 +628,9 @@ OpenEXRInput::PartInfo::parse_header(OpenEXRInput* in,
         case Imf::B44_COMPRESSION: comp = "b44"; break;
         case Imf::B44A_COMPRESSION: comp = "b44a"; break;
 #endif
-#if defined(OPENEXR_VERSION_MAJOR)                                             \
-    && (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100            \
-        + OPENEXR_VERSION_PATCH)                                               \
+#if defined(OPENEXR_VERSION_MAJOR)                                  \
+    && (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100 \
+        + OPENEXR_VERSION_PATCH)                                    \
            >= 20200
         case Imf::DWAA_COMPRESSION: comp = "dwaa"; break;
         case Imf::DWAB_COMPRESSION: comp = "dwab"; break;
@@ -866,13 +877,29 @@ TypeDesc_from_ImfPixelType(Imf::PixelType ptype)
 
 
 
+// Split a full channel name into layer and suffix.
+static void
+split_name(string_view fullname, string_view& layer, string_view& suffix)
+{
+    size_t dot = fullname.find_last_of('.');
+    if (dot == string_view::npos) {
+        suffix = fullname;
+        layer  = string_view();
+    } else {
+        layer  = string_view(fullname.data(), dot + 1);
+        suffix = string_view(fullname.data() + dot + 1,
+                             fullname.size() - dot - 1);
+    }
+}
+
+
 // Used to hold channel information for sorting into canonical order
 struct ChanNameHolder {
-    string_view fullname;
+    string_view fullname;    // layer.suffix
+    string_view layer;       // just layer
+    string_view suffix;      // just suffix (or the fillname, if no layer)
     int exr_channel_number;  // channel index in the exr (sorted by name)
-    string_view layer;
-    string_view suffix;
-    int special_index;
+    int special_index;       // sort order for special reserved names
     Imf::PixelType exr_data_type;
     TypeDesc datatype;
     int xSampling;
@@ -881,31 +908,51 @@ struct ChanNameHolder {
     ChanNameHolder(string_view fullname, int n, const Imf::Channel& exrchan)
         : fullname(fullname)
         , exr_channel_number(n)
+        , special_index(10000)
         , exr_data_type(exrchan.type)
         , datatype(TypeDesc_from_ImfPixelType(exrchan.type))
         , xSampling(exrchan.xSampling)
         , ySampling(exrchan.ySampling)
     {
-        size_t dot = fullname.find_last_of('.');
-        if (dot == string_view::npos) {
-            suffix = fullname;
-        } else {
-            layer  = string_view(fullname.data(), dot + 1);
-            suffix = string_view(fullname.data() + dot + 1,
-                                 fullname.size() - dot - 1);
-        }
+        split_name(fullname, layer, suffix);
+    }
+
+    // Compute canoninical channel list sort priority
+    void compute_special_index()
+    {
         static const char* special[]
             = { "R",    "Red",  "G",  "Green", "B",     "Blue",  "Y",
                 "real", "imag", "A",  "Alpha", "AR",    "RA",    "AG",
                 "GA",   "AB",   "BA", "Z",     "Depth", "Zback", nullptr };
-        special_index = 10000;
         for (int i = 0; special[i]; ++i)
             if (Strutil::iequals(suffix, special[i])) {
                 special_index = i;
-                break;
+                return;
             }
     }
 
+    // Compute alternate channel sort priority for layers that contain
+    // x,y,z.
+    void compute_special_index_xyz()
+    {
+        static const char* special[]
+            = { "R",  "Red", "G",  "Green", "B",    "Blue", /* "Y", */
+                "X",  "Y",   "Z",  "real",  "imag", "A",     "Alpha", "AR",
+                "RA", "AG",  "GA", "AB",    "BA",   "Depth", "Zback", nullptr };
+        for (int i = 0; special[i]; ++i)
+            if (Strutil::iequals(suffix, special[i])) {
+                special_index = i;
+                return;
+            }
+    }
+
+    // Partial sort on layer only
+    static bool compare_layer(const ChanNameHolder& a, const ChanNameHolder& b)
+    {
+        return (a.layer < b.layer);
+    }
+
+    // Full sort on layer name, special index, suffix
     static bool compare_cnh(const ChanNameHolder& a, const ChanNameHolder& b)
     {
         if (a.layer < b.layer)
@@ -920,6 +967,18 @@ struct ChanNameHolder {
         return a.suffix < b.suffix;
     }
 };
+
+
+// Is the channel name (suffix only) in the list?
+static bool
+suffixfound(string_view name, cspan<ChanNameHolder> chans)
+{
+    for (auto& c : chans)
+        if (Strutil::iequals(name, c.suffix))
+            return true;
+    return false;
+}
+
 
 }  // namespace
 
@@ -939,9 +998,47 @@ OpenEXRInput::PartInfo::query_channels(OpenEXRInput* in,
     for (auto ci = channels.begin(); ci != channels.end(); ++c, ++ci)
         cnh.emplace_back(ci.name(), c, ci.channel());
     spec.nchannels = int(cnh.size());
-    std::sort(cnh.begin(), cnh.end(), ChanNameHolder::compare_cnh);
+    if (!spec.nchannels) {
+        in->errorf("No channels found");
+        return false;
+    }
+
+    // First, do a partial sort by layername. EXR should already be in that
+    // order, but take no chances.
+    std::sort(cnh.begin(), cnh.end(), ChanNameHolder::compare_layer);
+
+    // Now, within each layer, sort by channel name
+    for (auto layerbegin = cnh.begin(); layerbegin != cnh.end();) {
+        // Identify the subrange that comprises a layer
+        auto layerend = layerbegin + 1;
+        while (layerend != cnh.end() && layerbegin->layer == layerend->layer)
+            ++layerend;
+
+        span<ChanNameHolder> layerspan(&(*layerbegin), layerend - layerbegin);
+        // Strutil::printf("layerspan:\n");
+        // for (auto& c : layerspan)
+        //     Strutil::printf("  %s = %s . %s\n", c.fullname, c.layer, c.suffix);
+        if (suffixfound("X", layerspan)
+            && (suffixfound("Y", layerspan) || suffixfound("Z", layerspan))) {
+            // If "X", and at least one of "Y" and "Z", are found among the
+            // channel names of this layer, it must encode some kind of
+            // position or normal. The usual sort order will give a weird
+            // result. Choose a different sort order to reflect this.
+            for (auto& ch : layerspan)
+                ch.compute_special_index_xyz();
+        } else {
+            // Use the usual sort order.
+            for (auto& ch : layerspan)
+                ch.compute_special_index();
+        }
+        std::sort(layerbegin, layerend, ChanNameHolder::compare_cnh);
+
+        layerbegin = layerend;  // next set of layers
+    }
+
     // Now we should have cnh sorted into the order that we want to present
     // to the OIIO client.
+
     spec.format         = TypeDesc::UNKNOWN;
     bool all_one_format = true;
     for (int c = 0; c < spec.nchannels; ++c) {

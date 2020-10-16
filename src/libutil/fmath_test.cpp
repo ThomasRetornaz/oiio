@@ -19,6 +19,9 @@
 
 using namespace OIIO;
 
+// Aid for things that are too short to benchmark accurately
+#define REP10(x) x, x, x, x, x, x, x, x, x, x
+
 static int iterations = 1000000;
 static int ntrials    = 5;
 static bool verbose   = false;
@@ -28,31 +31,20 @@ static bool verbose   = false;
 static void
 getargs(int argc, char* argv[])
 {
-    bool help = false;
     ArgParse ap;
     // clang-format off
-    ap.options(
-        "fmath_test\n" OIIO_INTRO_STRING "\n"
-        "Usage:  fmath_test [options]",
-        // "%*", parse_files, "",
-        "--help", &help, "Print help message",
-        "-v", &verbose, "Verbose mode",
-        // "--threads %d", &numthreads,
-        //     ustring::sprintf("Number of threads (default: %d)", numthreads).c_str(),
-        "--iterations %d", &iterations,
-            ustring::sprintf("Number of values to convert for benchmarks (default: %d)", iterations).c_str(),
-        "--trials %d", &ntrials, "Number of trials",
-        nullptr);
+    ap.intro("fmath_test\n" OIIO_INTRO_STRING)
+      .usage("fmath_test [options]");
+
+    ap.arg("-v", &verbose)
+      .help("Verbose mode");
+    ap.arg("--iters %d", &iterations)
+      .help(Strutil::sprintf("Number of iterations (default: %d)", iterations));
+    ap.arg("--trials %d", &ntrials)
+      .help("Number of trials");
     // clang-format on
-    if (ap.parse(argc, (const char**)argv) < 0) {
-        std::cerr << ap.geterror() << std::endl;
-        ap.usage();
-        exit(EXIT_FAILURE);
-    }
-    if (help) {
-        ap.usage();
-        exit(EXIT_FAILURE);
-    }
+
+    ap.parse(argc, (const char**)argv);
 }
 
 
@@ -139,9 +131,12 @@ test_math_functions()
     OIIO_CHECK_EQUAL(ifloor(0.999f), 0);
     OIIO_CHECK_EQUAL(ifloor(1.0f), 1);
     OIIO_CHECK_EQUAL(ifloor(1.001f), 1);
-    float fval = 1.1;
+    float fval = 1.1f;
     clobber(fval);
     bench("ifloor", [&]() { return DoNotOptimize(ifloor(fval)); });
+    fval = -1.1f;
+    clobber(fval);
+    bench("ifloor (neg)", [&]() { return DoNotOptimize(ifloor(fval)); });
 
     int ival;
     OIIO_CHECK_EQUAL_APPROX(floorfrac(0.0f, &ival), 0.0f);
@@ -165,6 +160,112 @@ test_math_functions()
     OIIO_CHECK_EQUAL(sign(3.1f), 1.0f);
     OIIO_CHECK_EQUAL(sign(-3.1f), -1.0f);
     OIIO_CHECK_EQUAL(sign(0.0f), 0.0f);
+
+    {
+        OIIO_CHECK_EQUAL(fast_neg(1.5f), -1.5f);
+        OIIO_CHECK_EQUAL(fast_neg(-1.5f), 1.5f);
+        OIIO_CHECK_EQUAL(fast_neg(0.0f), 0.0f);
+        OIIO_CHECK_EQUAL(fast_neg(-0.0f), 0.0f);
+        float x = -3.5f;
+        clobber(x);
+        bench("-float x10", [&]() { return REP10(DoNotOptimize(-x)); });
+        bench("fast_neg(float) x10",
+              [&]() { return REP10(DoNotOptimize(fast_neg(x))); });
+    }
+
+    {
+        float a = 2.5f, b = 1.5f, c = 8.5f;
+        clobber(a);
+        clobber(b);
+        clobber(c);
+        bench("madd fake a*b+c", [&]() { return DoNotOptimize(a * b + c); });
+        bench("madd(a,b,c)",
+              [&]() { return DoNotOptimize(OIIO::madd(a, b, c)); });
+        bench("std::fma(a,b,c)",
+              [&]() { return DoNotOptimize(std::fma(a, b, c)); });
+    }
+    {
+        float a = 2.5f, b = 1.5f, c = 8.5f;
+        OIIO_CHECK_EQUAL(clamp(2.5f, 1.5f, 8.5f), 2.5f);
+        OIIO_CHECK_EQUAL(clamp(1.5f, 2.5f, 8.5f), 2.5f);
+        OIIO_CHECK_EQUAL(clamp(8.5f, 1.5f, 2.5f), 2.5f);
+        clobber(a);
+        clobber(b);
+        clobber(c);
+        bench("clamp(f,f,f) middle",
+              [&]() { return DoNotOptimize(clamp(a, b, c)); });
+        bench("clamp(f,f,f) low",
+              [&]() { return DoNotOptimize(clamp(b, a, c)); });
+        bench("clamp(f,f,f) high",
+              [&]() { return DoNotOptimize(clamp(c, b, a)); });
+    }
+
+    {
+        float x = 1.3f, y = 2.5f;
+        clobber(x, y);
+        bench("std::cos", [&]() { return DoNotOptimize(std::cos(x)); });
+        bench("fast_cos", [&]() { return DoNotOptimize(fast_cos(x)); });
+        bench("fast_cospi", [&]() { return DoNotOptimize(fast_cospi(x)); });
+        bench("std::sin", [&]() { return DoNotOptimize(std::sin(x)); });
+        bench("fast_sin", [&]() { return DoNotOptimize(fast_sin(x)); });
+        bench("fast_sinpi", [&]() { return DoNotOptimize(fast_sinpi(x)); });
+        bench("std::tan", [&]() { return DoNotOptimize(std::tan(x)); });
+        bench("fast_tan", [&]() { return DoNotOptimize(fast_tan(x)); });
+        bench("std::acos", [&]() { return DoNotOptimize(std::acos(x)); });
+        bench("fast_acos", [&]() { return DoNotOptimize(fast_acos(x)); });
+        bench("std::asin", [&]() { return DoNotOptimize(std::asin(x)); });
+        bench("fast_asin", [&]() { return DoNotOptimize(fast_asin(x)); });
+        bench("std::atan2", [&]() { return DoNotOptimize(std::atan2(y, x)); });
+        bench("fast_atan2", [&]() { return DoNotOptimize(fast_atan2(y, x)); });
+
+        bench("std::log2", [&]() { return DoNotOptimize(std::log2(x)); });
+        bench("fast_log2", [&]() { return DoNotOptimize(fast_log2(x)); });
+        bench("std::log", [&]() { return DoNotOptimize(std::log(x)); });
+        bench("fast_log", [&]() { return DoNotOptimize(fast_log(x)); });
+        bench("std::log10", [&]() { return DoNotOptimize(std::log10(x)); });
+        bench("fast_log10", [&]() { return DoNotOptimize(fast_log10(x)); });
+        bench("std::exp", [&]() { return DoNotOptimize(std::exp(x)); });
+        bench("fast_exp", [&]() { return DoNotOptimize(fast_exp(x)); });
+        bench("fast_correct_exp",
+              [&]() { return DoNotOptimize(fast_correct_exp(x)); });
+        bench("std::exp2", [&]() { return DoNotOptimize(std::exp2(x)); });
+        bench("fast_exp2", [&]() { return DoNotOptimize(fast_exp2(x)); });
+
+        OIIO_CHECK_EQUAL(safe_fmod(5.0f, 2.5f), 0.0f);
+        OIIO_CHECK_EQUAL(safe_fmod(-5.0f, 2.5f), 0.0f);
+        OIIO_CHECK_EQUAL(safe_fmod(-5.0f, -2.5f), 0.0f);
+        OIIO_CHECK_EQUAL(safe_fmod(5.5f, 2.5f), 0.5f);
+        OIIO_CHECK_EQUAL(safe_fmod(-5.5f, 2.5f), -0.5f);
+        OIIO_CHECK_EQUAL(safe_fmod(-5.5f, -2.5f), -0.5f);
+        OIIO_CHECK_EQUAL(safe_fmod(5.5f, 0.0f), 0.0f);
+        bench("std::fmod", [&]() { return DoNotOptimize(std::fmod(y, x)); });
+        bench("safe_fmod", [&]() { return DoNotOptimize(safe_fmod(y, x)); });
+    }
+
+    {
+        OIIO_CHECK_EQUAL(fast_rint(0.0f), 0);
+        OIIO_CHECK_EQUAL(fast_rint(-1.0f), -1);
+        OIIO_CHECK_EQUAL(fast_rint(-1.2f), -1);
+        OIIO_CHECK_EQUAL(fast_rint(-0.8f), -1);
+        OIIO_CHECK_EQUAL(fast_rint(-1.49f), -1);
+        OIIO_CHECK_EQUAL(fast_rint(-1.50f), -2);
+        OIIO_CHECK_EQUAL(fast_rint(-1.51f), -2);
+        OIIO_CHECK_EQUAL(fast_rint(1.0f), 1);
+        OIIO_CHECK_EQUAL(fast_rint(1.2f), 1);
+        OIIO_CHECK_EQUAL(fast_rint(0.8f), 1);
+        OIIO_CHECK_EQUAL(fast_rint(1.49f), 1);
+        OIIO_CHECK_EQUAL(fast_rint(1.50f), 2);
+        OIIO_CHECK_EQUAL(fast_rint(1.51f), 2);
+        float a = 1.5f;
+        clobber(a);
+        bench("fast_rint", [&]() { return DoNotOptimize(fast_rint(a)); });
+        bench("std::lrint", [&]() { return DoNotOptimize(std::lrint(a)); });
+        bench("int(std::rint)",
+              [&]() { return DoNotOptimize(static_cast<int>(std::rint(a))); });
+        bench("int(x+copysignf(0.5f,x))", [&]() {
+            return DoNotOptimize(static_cast<int>(a + copysignf(0.5f, a)));
+        });
+    }
 }
 
 

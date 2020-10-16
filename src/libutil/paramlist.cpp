@@ -163,7 +163,7 @@ ParamValue::get_int_indexed(int index, int defaultval) const
         return get<unsigned long long>(index);
     if (base == TypeDesc::STRING) {
         // Only succeed for a string if it exactly holds something that
-        // excatly parses to an int value.
+        // exactly parses to an int value.
         string_view str = get<ustring>(index);
         int val         = defaultval;
         if (Strutil::parse_int(str, val) && str.empty())
@@ -225,7 +225,7 @@ ParamValue::get_float_indexed(int index, float defaultval) const
         return get<unsigned long long>(index);
     if (base == TypeDesc::STRING) {
         // Only succeed for a string if it exactly holds something
-        // that excatly parses to a float value.
+        // that exactly parses to a float value.
         string_view str = get<ustring>(index);
         float val       = defaultval;
         if (Strutil::parse_float(str, val) && str.empty())
@@ -293,8 +293,9 @@ ParamValue::get_string(int maxsize) const
                                              "",   ", ", true,     "%u" };
     std::string out                      = tostring(t, data(), fmt);
     if (n < nfull)
-        out += Strutil::sprintf(", ... [%d x %s]", nfull,
-                                TypeDesc(TypeDesc::BASETYPE(type().basetype)));
+        out += Strutil::sprintf(
+            ", ... [%d x %s]", nfull,
+            TypeDesc(TypeDesc::BASETYPE(type().basetype)).c_str());
     return out;
 }
 
@@ -545,7 +546,7 @@ ParamValueList::contains(string_view name, TypeDesc type,
 void
 ParamValueList::add_or_replace(const ParamValue& pv, bool casesensitive)
 {
-    iterator p = find(pv.name(), pv.type(), casesensitive);
+    iterator p = find(pv.name(), TypeUnknown, casesensitive);
     if (p != end())
         *p = pv;
     else
@@ -556,7 +557,7 @@ ParamValueList::add_or_replace(const ParamValue& pv, bool casesensitive)
 void
 ParamValueList::add_or_replace(ParamValue&& pv, bool casesensitive)
 {
-    iterator p = find(pv.name(), pv.type(), casesensitive);
+    iterator p = find(pv.name(), TypeUnknown, casesensitive);
     if (p != end())
         *p = pv;
     else
@@ -587,6 +588,49 @@ ParamValueList::getattribute(string_view name, std::string& value,
     if (p != cend()) {
         ustring s;
         bool ok = convert_type(p->type(), p->data(), TypeString, &s);
+        if (ok)
+            value = s.string();
+        return ok;
+    } else {
+        return false;
+    }
+}
+
+
+
+bool
+ParamValueList::getattribute_indexed(string_view name, int index, TypeDesc type,
+                                     void* value, bool casesensitive) const
+{
+    auto p = find(name, TypeUnknown, casesensitive);
+    if (p != cend()) {
+        if (index >= int(p->type().basevalues()))
+            return false;
+        TypeDesc basetype = p->type().scalartype();
+        return convert_type(basetype,
+                            (const char*)p->data() + index * basetype.size(),
+                            type, value);
+    } else {
+        return false;
+    }
+}
+
+
+
+bool
+ParamValueList::getattribute_indexed(string_view name, int index,
+                                     std::string& value,
+                                     bool casesensitive) const
+{
+    auto p = find(name, TypeUnknown, casesensitive);
+    if (p != cend()) {
+        if (index >= int(p->type().basevalues()))
+            return false;
+        TypeDesc basetype = p->type().scalartype();
+        ustring s;
+        bool ok = convert_type(basetype,
+                               (const char*)p->data() + index * basetype.size(),
+                               TypeString, &s);
         if (ok)
             value = s.string();
         return ok;

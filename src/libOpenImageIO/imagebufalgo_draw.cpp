@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
 
-#include <IlmBase/Half/half.h>
+#include <half.h>
 
 #include <algorithm>
 #include <cmath>

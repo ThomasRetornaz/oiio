@@ -551,6 +551,12 @@ public:
     ///   coordinate system where $x$ and $y$ range from -1 to +1.
     ///   Generally, only rendered images will have this.
     ///
+    /// - `"worldtoNDC"` : The projection matrix, which is a 4x4 matrix
+    ///   (an `Imath::M44f`, described as `TypeDesc(FLOAT,MATRIX)`), giving
+    ///   the matrix that projected points from world space into a 2D NDC
+    ///   coordinate system where $x$ and $y$ range from 0 to +1. Generally,
+    ///   only rendered images will have this.
+    ///
     /// - `"averagecolor"` : If available in the metadata (generally only
     ///   for files that have been processed by `maketx`), this will return
     ///   the average color of the texture (into an array of `float`).
@@ -601,7 +607,7 @@ public:
     ///   (`float`).
     ///
     /// - `"stat:mipsused"` : Stores 1 if any MIP levels beyond the highest
-    ///   resolution were accesed, otherwise 0. (`int`)
+    ///   resolution were accessed, otherwise 0. (`int`)
     ///
     /// - `"stat:is_duplicate"` : Stores 1 if this file was a duplicate of
     ///   another image, otherwise 0. (`int`)
@@ -736,8 +742,8 @@ public:
     ///             include the begin value but not the end value (much like
     ///             STL begin/end usage).
     /// @param  chbegin/chend
-    ///             Channel range to retrieve. For all channels, use
-    ///             `chbegin = 0`, `chend = spec.nchannels`.
+    ///             Channel range to retrieve. To retrieve all channels, use
+    ///             `chbegin = 0`, `chend = nchannels`.
     /// @param  format
     ///             TypeDesc describing the data type of the values you want
     ///             to retrieve into `result`. The pixel values will be
@@ -898,8 +904,8 @@ public:
     /// Once created, the ImageCache owns the ImageInput and is responsible
     /// for destroying it when done. Custom ImageInputs allow "procedural"
     /// images, among other things.  Also, this is the method you use to set
-    /// up a "writeable" ImageCache images (perhaps with a type of
-    /// ImageInput that's just a stub that does as little as possible).
+    /// up a "writable" ImageCache images (perhaps with a type of ImageInput
+    /// that's just a stub that does as little as possible).
     ///
     /// If `config` is not NULL, it points to an ImageSpec with configuration
     /// options/hints that will be passed to the underlying

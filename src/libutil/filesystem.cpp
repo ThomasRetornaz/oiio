@@ -201,12 +201,11 @@ Filesystem::searchpath_find(const std::string& filename_utf8,
             return pathstr(f);
         }
 
-
         if (recursive && filesystem::is_directory(d, ec)) {
             std::vector<std::string> subdirs;
-            for (filesystem::directory_iterator s(d), end_iter; s != end_iter;
-                 ++s) {
-                if (filesystem::is_directory(s->status())) {
+            for (filesystem::directory_iterator s(d, ec), end_iter;
+                 !ec && s != end_iter; ++s) {
+                if (filesystem::is_directory(s->path(), ec)) {
                     subdirs.push_back(pathstr(s->path()));
                 }
             }
@@ -240,15 +239,17 @@ Filesystem::get_directory_entries(const std::string& dirname,
     }
 
     if (recursive) {
-        for (filesystem::recursive_directory_iterator s(dirpath);
-             s != filesystem::recursive_directory_iterator(); ++s) {
+        error_code ec;
+        for (filesystem::recursive_directory_iterator s(dirpath, ec);
+             !ec && s != filesystem::recursive_directory_iterator(); ++s) {
             std::string file = pathstr(s->path());
             if (!filter_regex.size() || regex_search(file, re))
                 filenames.push_back(file);
         }
     } else {
-        for (filesystem::directory_iterator s(dirpath);
-             s != filesystem::directory_iterator(); ++s) {
+        error_code ec;
+        for (filesystem::directory_iterator s(dirpath, ec);
+             !ec && s != filesystem::directory_iterator(); ++s) {
             std::string file = pathstr(s->path());
             if (!filter_regex.size() || regex_search(file, re))
                 filenames.push_back(file);
@@ -508,6 +509,19 @@ Filesystem::read_text_file(string_view filename, std::string& str)
 
 
 
+bool
+Filesystem::write_text_file(string_view filename, string_view str)
+{
+    OIIO::ofstream out;
+    Filesystem::open(out, filename);
+    // N.B. for binary write: open(out, filename, std::ios::out|std::ios::binary);
+    if (out)
+        out << str;
+    return out.good();
+}
+
+
+
 /// Read the entire contents of the named file and place it in str,
 /// returning true on success, false on failure.
 size_t
@@ -644,8 +658,8 @@ Filesystem::parse_pattern(const char* pattern_, int framepadding_override,
     // string (e.g. "%04d").
 #define ONERANGE_SPEC "[0-9]+(-[0-9]+((x|y)-?[0-9]+)?)?"
 #define MANYRANGE_SPEC ONERANGE_SPEC "(," ONERANGE_SPEC ")*"
-#define SEQUENCE_SPEC                                                          \
-    "(" MANYRANGE_SPEC ")?"                                                    \
+#define SEQUENCE_SPEC       \
+    "(" MANYRANGE_SPEC ")?" \
     "((#|@)+|(%[0-9]*d))"
     static regex sequence_re(SEQUENCE_SPEC);
     // std::cout << "pattern >" << (SEQUENCE_SPEC) << "<\n";
@@ -858,9 +872,9 @@ Filesystem::scan_for_matching_filenames(const std::string& pattern_,
     try {
         regex pattern_re(pattern_re_str);
 
-        for (filesystem::directory_iterator it(u8path(directory)), end_it;
-             it != end_it; ++it) {
-            error_code ec;
+        error_code ec;
+        for (filesystem::directory_iterator it(u8path(directory), ec), end_it;
+             !ec && it != end_it; ++it) {
             if (filesystem::is_regular(it->path(), ec)) {
                 const std::string f = pathstr(it->path());
                 match_results<std::string::const_iterator> frame_match;

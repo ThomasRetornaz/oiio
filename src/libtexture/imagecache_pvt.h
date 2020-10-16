@@ -336,6 +336,7 @@ private:
     ustring m_filename;            ///< Filename
     bool m_used;                   ///< Recently used (in the LRU sense)
     bool m_broken;                 ///< has errors; can't be used properly
+    bool m_allow_release = true;   ///< Allow the file to release()?
     std::string m_broken_message;  ///< Error message for why it's broken
     std::shared_ptr<ImageInput> m_input;  ///< Open ImageInput, NULL if closed
         // Note that m_input, the shared pointer itself, is NOT safe to
@@ -990,7 +991,7 @@ public:
     }
 
     /// Called when a file is closed, so that the system can track
-    /// the number of simultyaneously-opened files.
+    /// the number of simultaneously-opened files.
     void decr_open_files(void) { --m_stat_open_files_current; }
 
     /// Called when a new tile is created, to update all the stats.
@@ -1020,6 +1021,12 @@ public:
     void errorf(const char* fmt, const Args&... args) const
     {
         append_error(Strutil::sprintf(fmt, args...));
+    }
+    /// Internal error reporting routine, with std::format-like arguments.
+    template<typename... Args>
+    void error(const char* fmt, const Args&... args) const
+    {
+        append_error(Strutil::fmt::format(fmt, args...));
     }
     void error(const char* msg) const { append_error(msg); }
 

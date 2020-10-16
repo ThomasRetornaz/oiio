@@ -16,103 +16,14 @@ message (STATUS "${ColorBoldWhite}")
 message (STATUS "* Checking for dependencies...")
 message (STATUS "*   - Missing a dependency 'Package'?")
 message (STATUS "*     Try cmake -DPackage_ROOT=path or set environment var Package_ROOT=path")
+message (STATUS "*     For many dependencies, we supply src/build-scripts/build_Package.bash")
 message (STATUS "*   - To exclude an optional dependency (even if found),")
 message (STATUS "*     -DUSE_Package=OFF or set environment var USE_Package=OFF ")
 message (STATUS "${ColorReset}")
 
-
-# checked_find_package(pkgname ..) is a wrapper for find_package, with the
-# following extra features:
-#   * If either USE_<pkgname> or the all-uppercase USE_PKGNAME exists as
-#     either a CMake or environment variable, is nonempty by contains a
-#     non-true/nonnzero value, do not search for or use the package. The
-#     optional ENABLE <var> arguments allow you to override the name of the
-#     enabling variable. In other words, support for the dependency is
-#     presumed to be ON, unless turned off explicitly from one of these
-#     sources.
-#   * Print a message if the package is enabled but not found. This is based
-#     on ${pkgname}_FOUND or $PKGNNAME_FOUND.
-#   * Optional DEFINITIONS <string> are passed to add_definitions if the
-#     package is found.
-#   * Optional PRINT <list> is a list of variables that will be printed
-#     if the package is found, if VERBOSE is on.
-#   * Optional DEPS <list> is a list of hard dependencies; for each one, if
-#     dep_FOUND is not true, disable this package with an error message.
-#   * Optional ISDEPOF <downstream> names another package for which the
-#     present package is only needed because it's a dependency, and
-#     therefore if <downstream> is disabled, we don't bother with this
-#     package either.
-#
-# N.B. This needs to be a macro, not a function, because the find modules
-# will set(blah val PARENT_SCOPE) and we need that to be the global scope,
-# not merely the scope for this function.
-macro (checked_find_package pkgname)
-    cmake_parse_arguments(_pkg "" "ENABLE;ISDEPOF" "DEFINITIONS;PRINT;DEPS" ${ARGN})
-        # Arguments: <prefix> noValueKeywords singleValueKeywords multiValueKeywords argsToParse
-    string (TOUPPER ${pkgname} pkgname_upper)
-    if (NOT VERBOSE)
-        set (${pkgname}_FIND_QUIETLY true)
-        set (${pkgname_upper}_FIND_QUIETLY true)
-    endif ()
-    set (_quietskip false)
-    check_is_enabled (${pkgname} _enable)
-    set (_disablereason "")
-    foreach (_dep ${_pkg_DEPS})
-        if (_enable AND NOT ${_dep}_FOUND)
-            set (_enable false)
-            set (_disablereason "(because ${_dep} was not found)")
-        endif ()
-    endforeach ()
-    if (_pkg_ISDEPOF)
-        check_is_enabled (${_pkg_ISDEPOF} _dep_enabled)
-        if (NOT _dep_enabled)
-            set (_enable false)
-            set (_quietskip true)
-        endif ()
-    endif ()
-    if (_enable)
-        find_package (${pkgname} ${_pkg_UNPARSED_ARGUMENTS})
-        if (${pkgname}_FOUND OR ${pkgname_upper}_FOUND)
-            foreach (_vervar ${pkgname_upper}_VERSION ${pkgname}_VERSION_STRING
-                             ${pkgname_upper}_VERSION_STRING)
-                if (NOT ${pkgname}_VERSION AND ${_vervar})
-                    set (${pkgname}_VERSION ${${_vervar}})
-                endif ()
-            endforeach ()
-            message (STATUS "${ColorGreen}Found ${pkgname} ${${pkgname}_VERSION} ${ColorReset}")
-            if (VERBOSE)
-                set (_vars_to_print ${pkgname}_INCLUDES ${pkgname_upper}_INCLUDES
-                                    ${pkgname}_INCLUDE_DIR ${pkgname_upper}_INCLUDE_DIR
-                                    ${pkgname}_INCLUDE_DIRS ${pkgname_upper}_INCLUDE_DIRS
-                                    ${pkgname}_LIBRARIES ${pkgname_upper}_LIBRARIES
-                                    ${_pkg_PRINT})
-                list (REMOVE_DUPLICATES _vars_to_print)
-                foreach (_v IN LISTS _vars_to_print)
-                    if (NOT "${${_v}}" STREQUAL "")
-                        message (STATUS "    ${_v} = ${${_v}}")
-                    endif ()
-                endforeach ()
-            endif ()
-            add_definitions (${_pkg_DEFINITIONS})
-        else ()
-            message (STATUS "${ColorRed}${pkgname} library not found ${ColorReset}")
-            if (${pkgname}_ROOT)
-                message (STATUS "${ColorRed}    ${pkgname}_ROOT was: ${${pkgname}_ROOT} ${ColorReset}")
-            elseif ($ENV{${pkgname}_ROOT})
-                message (STATUS "${ColorRed}    ENV ${pkgname}_ROOT was: ${${pkgname}_ROOT} ${ColorReset}")
-            else ()
-                message (STATUS "${ColorRed}    Try setting ${pkgname}_ROOT ? ${ColorReset}")
-            endif ()
-        endif()
-    else ()
-        if (NOT _quietskip)
-            message (STATUS "${ColorRed}Not using ${pkgname} -- disabled ${_disablereason} ${ColorReset}")
-        endif ()
-    endif ()
-endmacro()
-
-
-
+set (OIIO_LOCAL_DEPS_PATH "${CMAKE_SOURCE_DIR}/ext/dist" CACHE STRING
+     "Local area for dependencies added to CMAKE_PREFIX_PATH")
+list (APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/ext/dist)
 
 include (ExternalProject)
 
@@ -123,6 +34,9 @@ option (BUILD_MISSING_DEPS "Try to download and build any missing dependencies" 
 # Boost setup
 if (LINKSTATIC)
     set (Boost_USE_STATIC_LIBS ON)
+    if (MSVC)
+        add_definitions (-DBOOST_ALL_NO_LIB=1)
+    endif ()
 else ()
     if (MSVC)
         add_definitions (-DBOOST_ALL_DYN_LINK=1)
@@ -166,11 +80,15 @@ link_directories ("${Boost_LIBRARY_DIRS}")
 # that we will not complete the build if they are not found.
 
 checked_find_package (ZLIB REQUIRED)  # Needed by several packages
-checked_find_package (PNG REQUIRED)
-checked_find_package (TIFF 3.0 REQUIRED)
+checked_find_package (TIFF 3.0 REQUIRED
+                      #RECOMMEND_MIN 4.0
+                      #RECOMMEND_MIN_REASON "to support >4GB files"
+		      )
 
 # IlmBase & OpenEXR
-checked_find_package (OpenEXR 2.0 REQUIRED)
+checked_find_package (OpenEXR 2.0 REQUIRED
+                      RECOMMEND_MIN 2.2
+                      RECOMMEND_MIN_REASON "for DWA compression")
 # We use Imath so commonly, may as well include it everywhere.
 include_directories ("${OPENEXR_INCLUDES}" "${ILMBASE_INCLUDES}"
                      "${ILMBASE_INCLUDES}/OpenEXR")
@@ -196,8 +114,8 @@ endif ()
 # allow this to be overridden to use the distro-provided package if desired.
 option (USE_EXTERNAL_PUGIXML "Use an externally built shared library version of the pugixml library" OFF)
 if (USE_EXTERNAL_PUGIXML)
-    checked_find_package (PugiXML REQUIRED
-                       DEFINITIONS -DUSE_EXTERNAL_PUGIXML=1)
+    checked_find_package (pugixml REQUIRED
+                          DEFINITIONS -DUSE_EXTERNAL_PUGIXML=1)
 endif()
 
 
@@ -205,6 +123,8 @@ endif()
 ###########################################################################
 # Dependencies for optional formats and features. If these are not found,
 # we will continue building, but the related functionality will be disabled.
+
+checked_find_package (PNG)
 
 checked_find_package (BZip2)   # Used by ffmpeg and freetype
 if (NOT BZIP2_FOUND)
@@ -222,6 +142,7 @@ checked_find_package (OpenCV
                    DEFINITIONS  -DUSE_OPENCV=1)
 
 # Intel TBB
+set (TBB_USE_DEBUG_BUILD OFF)
 checked_find_package (TBB 2017
                    DEFINITIONS  -DUSE_TBB=1
                    ISDEPOF      OpenVDB)
@@ -231,11 +152,15 @@ checked_find_package (FFmpeg 2.6)
 checked_find_package (Field3D
                    DEPS         HDF5
                    DEFINITIONS  -DUSE_FIELD3D=1)
-checked_find_package (GIF 4)
+checked_find_package (GIF 4
+                      RECOMMEND_MIN 5.0
+                      RECOMMEND_MIN_REASON "for stability and thread safety")
 checked_find_package (Libheif 1.3)  # For HEIF/HEIC format
 checked_find_package (LibRaw
-                    PRINT LibRaw_r_LIBRARIES)
-checked_find_package (OpenJpeg)
+                      PRINT LibRaw_r_LIBRARIES
+                      RECOMMEND_MIN 0.18
+                      RECOMMEND_MIN_REASON "for ACES support")
+checked_find_package (OpenJpeg 2.0)
 checked_find_package (OpenVDB 5.0
                    DEPS         TBB
                    DEFINITIONS  -DUSE_OPENVDB=1)
@@ -270,43 +195,27 @@ endif()
 ###########################################################################
 # Tessil/robin-map
 
-option (BUILD_ROBINMAP_FORCE "Force local download/build of robin-map even if installed" OFF)
-option (BUILD_MISSING_ROBINMAP "Local download/build of robin-map if not installed" ON)
-set (BUILD_ROBINMAP_VERSION "v0.6.2" CACHE STRING "Preferred Tessil/robin-map version, of downloading/building our own")
+include(FetchContent)
+FetchContent_Declare(
+  robin_map
+  GIT_REPOSITORY "https://github.com/Tessil/robin-map"
+  # Uncomment and set the following to a specific hash to
+  # lock down to a specific commit and avoid contacting
+  # the remote once we've already cloned/fetched it
+  GIT_TAG v0.6.2
+  )
 
-macro (find_or_download_robin_map)
-    # If we weren't told to force our own download/build of robin-map, look
-    # for an installed version. Still prefer a copy that seems to be
-    # locally installed in this tree.
-    if (NOT BUILD_ROBINMAP_FORCE)
-        find_package (Robinmap QUIET)
-    endif ()
-    # If an external copy wasn't found and we requested that missing
-    # packages be built, or we we are forcing a local copy to be built, then
-    # download and build it.
-    # Download the headers from github
-    if ((BUILD_MISSING_ROBINMAP AND NOT ROBINMAP_FOUND) OR BUILD_ROBINMAP_FORCE)
-        message (STATUS "Downloading local Tessil/robin-map")
-        set (ROBINMAP_INSTALL_DIR "${PROJECT_SOURCE_DIR}/ext/robin-map")
-        set (ROBINMAP_GIT_REPOSITORY "https://github.com/Tessil/robin-map")
-        if (NOT IS_DIRECTORY ${ROBINMAP_INSTALL_DIR}/include/tsl)
-            find_package (Git QUIET)
-            execute_process(COMMAND             ${GIT_EXECUTABLE} clone    ${ROBINMAP_GIT_REPOSITORY} -n ${ROBINMAP_INSTALL_DIR})
-            execute_process(COMMAND             ${GIT_EXECUTABLE} checkout ${BUILD_ROBINMAP_VERSION}
-                            WORKING_DIRECTORY   ${ROBINMAP_INSTALL_DIR})
-            if (IS_DIRECTORY ${ROBINMAP_INSTALL_DIR}/include/tsl)
-                message (STATUS "DOWNLOADED Tessil/robin-map to ${ROBINMAP_INSTALL_DIR}.\n"
-                         "Remove that dir to get rid of it.")
-            else ()
-                message (FATAL_ERROR "Could not download Tessil/robin-map")
-            endif ()
-        endif ()
-        set (ROBINMAP_INCLUDE_DIR "${ROBINMAP_INSTALL_DIR}/include")
-    endif ()
-    set(CMAKE_PREFIX_PATH ${ROBINMAP_INSTALL_DIR})
-    checked_find_package (Robinmap REQUIRED)
-endmacro()
-
+FetchContent_GetProperties(robin_map) #mispelled name in original post
+if(NOT robin_map_POPULATED)   # name is lowercased
+  FetchContent_Populate(robin_map)
+  message(STATUS "robin_map source dir: ${robin_map_SOURCE_DIR}")
+  message(STATUS "robin_map binary dir: ${robin_map_BINARY_DIR}")
+  #add_subdirectory(${catch2_SOURCE_DIR} ${catch2_BINARY_DIR}) # name is lowercased
+  set (ROBINMAP_INCLUDE_DIR "${robin_map_SOURCE_DIR}/include")
+  set(CMAKE_PREFIX_PATH ${ROBINMAP_INCLUDE_DIR})
+  set(ROBINMAP_INCLUDES ${ROBINMAP_INCLUDE_DIR})
+  #checked_find_package (fmt QUIET)
+endif()
 
 ###########################################################################
 # libsquish
@@ -320,42 +229,66 @@ endif ()
 
 ###########################################################################
 # fmtlib
+include(FetchContent)
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY "https://github.com/fmtlib/fmt"
+  # Uncomment and set the following to a specific hash to
+  # lock down to a specific commit and avoid contacting
+  # the remote once we've already cloned/fetched it
+  GIT_TAG 6.1.2
+  )
 
-option (BUILD_FMT_FORCE "Force local download/build of fmt even if installed" OFF)
-option (BUILD_MISSING_FMT "Local download/build of fmt if not installed" ON)
-set (BUILD_FMT_VERSION "6.1.2" CACHE STRING "Preferred fmtlib/fmt version, when downloading/building our own")
+FetchContent_GetProperties(fmt) #mispelled name in original post
+if(NOT fmt_POPULATED)   # name is lowercased
+  FetchContent_Populate(fmt)
+  message(STATUS "fmt source dir: ${fmt_SOURCE_DIR}")
+  message(STATUS "fmt binary dir: ${fmt_BINARY_DIR}")
+  #add_subdirectory(${catch2_SOURCE_DIR} ${catch2_BINARY_DIR}) # name is lowercased
+  set (FMT_INCLUDE_DIR "${fmt_SOURCE_DIR}/include")
+  set(CMAKE_PREFIX_PATH ${FMT_INSTALL_DIR})
+  set(FMT_INCLUDES ${FMT_INCLUDE_DIR})
+  set(FMT_INCLUDES ${FMT_INCLUDES} PARENT_SCOPE)
 
-macro (find_or_download_fmt)
-    # If we weren't told to force our own download/build of fmt, look
-    # for an installed version. Still prefer a copy that seems to be
-    # locally installed in this tree.
-    if (NOT BUILD_FMT_FORCE)
-        find_package (fmt QUIET)
-    endif ()
-    # If an external copy wasn't found and we requested that missing
-    # packages be built, or we we are forcing a local copy to be built, then
-    # download and build it.
-    if ((BUILD_MISSING_FMT AND NOT FMT_FOUND) OR BUILD_FMT_FORCE)
-        message (STATUS "Downloading local fmtlib/fmt")
-        set (FMT_INSTALL_DIR "${PROJECT_SOURCE_DIR}/ext/fmt")
-        set (FMT_GIT_REPOSITORY "https://github.com/fmtlib/fmt")
-        if (NOT IS_DIRECTORY ${FMT_INSTALL_DIR}/include/fmt)
-            find_package (Git QUIET)
-            execute_process(COMMAND             ${GIT_EXECUTABLE} clone    ${FMT_GIT_REPOSITORY} -n ${FMT_INSTALL_DIR})
-            execute_process(COMMAND             ${GIT_EXECUTABLE} checkout ${BUILD_FMT_VERSION}
-                            WORKING_DIRECTORY   ${FMT_INSTALL_DIR})
-            if (IS_DIRECTORY ${FMT_INSTALL_DIR}/include/fmt)
-                message (STATUS "DOWNLOADED fmtlib/fmt to ${FMT_INSTALL_DIR}.\n"
-                         "Remove that dir to get rid of it.")
-            else ()
-                message (FATAL_ERROR "Could not download fmtlib/fmt")
-            endif ()
-        endif ()
-        set (FMT_INCLUDE_DIR "${FMT_INSTALL_DIR}/include")
-    endif ()
-    set(CMAKE_PREFIX_PATH ${FMT_INSTALL_DIR})
-    checked_find_package (fmt REQUIRED)
-endmacro()
+  #checked_find_package (fmt QUIET)
+endif()
+# option (BUILD_FMT_FORCE "Force local download/build of fmt even if installed" ON)
+# option (BUILD_MISSING_FMT "Local download/build of fmt if not installed" ON)
+# set (BUILD_FMT_VERSION "6.1.2" CACHE STRING "Preferred fmtlib/fmt version, when downloading/building our own")
 
-find_or_download_fmt()
-include_directories (${FMT_INCLUDES})
+# macro (find_or_download_fmt)
+#     # If we weren't told to force our own download/build of fmt, look
+#     # for an installed version. Still prefer a copy that seems to be
+#     # locally installed in this tree.
+#     if (NOT BUILD_FMT_FORCE)
+#         find_package (fmt QUIET)
+#     endif ()
+#     # If an external copy wasn't found and we requested that missing
+#     # packages be built, or we we are forcing a local copy to be built, then
+#     # download and build it.
+#     if ((BUILD_MISSING_FMT AND NOT FMT_FOUND) OR BUILD_FMT_FORCE)
+#         message (STATUS "Downloading local fmtlib/fmt")
+#         set (FMT_INSTALL_DIR "${PROJECT_SOURCE_DIR}/ext/fmt")
+#         set (FMT_GIT_REPOSITORY "https://github.com/fmtlib/fmt")
+#         if (NOT IS_DIRECTORY ${FMT_INSTALL_DIR}/include/fmt)
+#             find_package (Git REQUIRED)
+#             execute_process(COMMAND             ${GIT_EXECUTABLE} clone    ${FMT_GIT_REPOSITORY} -n ${FMT_INSTALL_DIR})
+#             execute_process(COMMAND             ${GIT_EXECUTABLE} checkout ${BUILD_FMT_VERSION}
+#                             WORKING_DIRECTORY   ${FMT_INSTALL_DIR})
+#             if (IS_DIRECTORY ${FMT_INSTALL_DIR}/include/fmt)
+#                 message (STATUS "DOWNLOADED fmtlib/fmt to ${FMT_INSTALL_DIR}.\n"
+#                          "Remove that dir to get rid of it.")
+#             else ()
+#                 message (FATAL_ERROR "Could not download fmtlib/fmt")
+#             endif ()
+#         endif ()
+#         set (FMT_INCLUDE_DIR "${FMT_INSTALL_DIR}/include")
+#     endif ()
+#     set(CMAKE_PREFIX_PATH ${FMT_INSTALL_DIR})
+#     checked_find_package (fmt QUIET)
+# endmacro()
+
+# find_or_download_fmt()
+# set(CMAKE_PREFIX_PATH ${FMT_INCLUDES})
+# checked_find_package (fmt REQUIRED)
+include_directories (BEFORE SYSTEM ${FMT_INCLUDES})

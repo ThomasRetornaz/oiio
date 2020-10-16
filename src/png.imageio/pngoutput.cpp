@@ -153,7 +153,7 @@ PNGOutput::open(const std::string& name, const ImageSpec& userspec,
     }
 
     std::string s = PNG_pvt::create_write_struct(m_png, m_info, m_color_type,
-                                                 m_spec);
+                                                 m_spec, this);
     if (s.length()) {
         close();
         errorf("%s", s);
@@ -184,6 +184,34 @@ PNGOutput::open(const std::string& name, const ImageSpec& userspec,
     } else {
         png_set_compression_strategy(m_png, Z_DEFAULT_STRATEGY);
     }
+
+    png_set_filter(m_png, 0,
+                   spec().get_int_attribute("png:filter", PNG_NO_FILTERS));
+    // https://www.w3.org/TR/PNG-Encoders.html#E.Filter-selection
+    // https://www.w3.org/TR/PNG-Rationale.html#R.Filtering
+    // The official advice is to PNG_NO_FILTER for palette or < 8 bpp
+    // images, but we and one of the others may be fine for >= 8 bit
+    // greyscale or color images (they aren't very prescriptive, noting that
+    // different flters may be better for different images.
+    // We have found the tradeoff complex, in fact as seen in
+    // https://github.com/OpenImageIO/oiio/issues/2645
+    // where we showed that across several images, 8 (PNG_FILTER_NONE --
+    // don't ask me how that's different from PNG_NO_FILTERS) had the
+    // fastest performance, but also made the largest files. I had trouble
+    // finding a filter choice that for "ordinary" images consistently
+    // performed better than the default on both time and resulting file
+    // size. So for now, we are keeping the default 0 (PNG_NO_FILTERS).
+
+#if defined(PNG_SKIP_sRGB_CHECK_PROFILE) && defined(PNG_SET_OPTION_SUPPORTED)
+    // libpng by default checks ICC profiles and are very strict, treating
+    // it as a serious error if it doesn't match th profile it thinks is
+    // right for sRGB. This call disables that behavior, which tends to have
+    // many false positives. Some references to discussion about this:
+    //    https://github.com/kornelski/pngquant/issues/190
+    //    https://sourceforge.net/p/png-mng/mailman/message/32003609/
+    //    https://bugzilla.gnome.org/show_bug.cgi?id=721135
+    png_set_option(m_png, PNG_SKIP_sRGB_CHECK_PROFILE, PNG_OPTION_ON);
+#endif
 
     PNG_pvt::write_info(m_png, m_info, m_color_type, m_spec, m_pngtext,
                         m_convert_alpha, m_gamma);

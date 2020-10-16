@@ -5,16 +5,15 @@
 if (VERBOSE)
    message (STATUS "Create imagio_pvt.h from imageio_pvt.h.in")
 endif ()
-file (TO_NATIVE_PATH "${PLUGIN_SEARCH_PATH}" PLUGIN_SEARCH_PATH_NATIVE)
 configure_file (imageio_pvt.h.in "${CMAKE_BINARY_DIR}/include/imageio_pvt.h" @ONLY)
 
 file (GLOB libOpenImageIO_hdrs ../include/OpenImageIO/*.h)
 
 if (NOT USE_EXTERNAL_PUGIXML)
     list (APPEND libOpenImageIO_hdrs
-          ../include/OpenImageIO/pugiconfig.hpp
-          ../include/OpenImageIO/pugixml.hpp
-          ../include/OpenImageIO/pugixml.cpp
+          ../include/OpenImageIO/detail/pugixml/pugiconfig.hpp
+          ../include/OpenImageIO/detail/pugixml/pugixml.hpp
+          ../include/OpenImageIO/detail/pugixml/pugixml.cpp
     )
     if (CMAKE_COMPILER_IS_GNUCC AND NOT ${GCC_VERSION} VERSION_LESS 6.0)
         set_source_files_properties (formatspec.cpp xmp.cpp
@@ -123,10 +122,10 @@ source_group ("libtexture" REGULAR_EXPRESSION ".+/libtexture/.+")
 target_include_directories (OpenImageIO
                             PUBLIC
                                 ${CMAKE_INSTALL_FULL_INCLUDEDIR}
+                                ${ILMBASE_INCLUDES}
                                 ${OpenCV_INCLUDES}
                             PRIVATE
                                 ${ROBINMAP_INCLUDES}
-                                ${OPENCOLORIO_INCLUDES}
                                 ${FREETYPE_INCLUDE_DIRS}
                             )
 
@@ -143,7 +142,7 @@ target_link_libraries (OpenImageIO
         PRIVATE
             ${SANITIZE_LIBRARIES}
             ${format_plugin_libs} # Add all the target link libraries from the plugins
-            ${OPENCOLORIO_LIBRARIES}
+            $<$<BOOL:${OpenColorIO_FOUND}>:OpenColorIO::OpenColorIO>
             ${BZIP2_LIBRARIES}
             ${ZLIB_LIBRARIES}
             ${Boost_LIBRARIES}
@@ -151,10 +150,12 @@ target_link_libraries (OpenImageIO
         )
 
 if (USE_EXTERNAL_PUGIXML)
-    # insert include path to pugixml first, to ensure that the external
-    # pugixml is found, and not the one in OIIO's include directory.
-    target_include_directories (OpenImageIO PRIVATE BEFORE ${PUGIXML_INCLUDES})
-    target_link_libraries (OpenImageIO PRIVATE ${PUGIXML_LIBRARIES})
+    if(TARGET pugixml)
+        target_link_libraries (OpenImageIO PRIVATE pugixml)
+    else()
+        target_include_directories (OpenImageIO PRIVATE ${PUGIXML_INCLUDES})
+        target_link_libraries (OpenImageIO PRIVATE ${PUGIXML_LIBRARIES})
+    endif()
 endif()
 
 if (FREETYPE_FOUND)

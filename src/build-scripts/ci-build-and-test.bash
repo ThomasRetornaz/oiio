@@ -19,34 +19,44 @@ if [[ ! -e dist/$PLATFORM ]] ; then
     mkdir -p dist/$PLATFORM
 fi
 
-if [[ "$ARCH" == "windows64" ]] ; then
-    pushd build/$PLATFORM
-    cmake ../.. -G "$CMAKE_GENERATOR" \
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+if [[ "$USE_SIMD" != "" ]] ; then
+    MY_CMAKE_FLAGS="$MY_CMAKE_FLAGS -DUSE_SIMD=$USE_SIMD"
+fi
+if [[ "$DEBUG" == "1" ]] ; then
+    export CMAKE_BUILD_TYPE=Debug
+fi
+
+pushd build/$PLATFORM
+cmake ../.. -G "$CMAKE_GENERATOR" \
+        -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
         -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
         -DCMAKE_INSTALL_PREFIX="$OpenImageIO_ROOT" \
         -DPYTHON_VERSION="$PYTHON_VERSION" \
+        -DCMAKE_INSTALL_LIBDIR="$OpenImageIO_ROOT/lib" \
+        -DCMAKE_CXX_STANDARD="$CMAKE_CXX_STANDARD" \
         $MY_CMAKE_FLAGS -DVERBOSE=1
-    echo "Parallel build $CMAKE_BUILD_PARALLEL_LEVEL"
-    # export VERBOSE=1
-    time cmake --build . --target install --config ${CMAKE_BUILD_TYPE}
+if [[ "$BUILDTARGET" != "none" ]] ; then
+    echo "Parallel build " ${CMAKE_BUILD_PARALLEL_LEVEL}
+    time cmake --build . --target ${BUILDTARGET:=install} --config ${CMAKE_BUILD_TYPE}
+fi
+popd
+
+if [[ "${DEBUG_CI:=0}" != "0" ]] ; then
+    echo "PATH=$PATH"
+    echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+    echo "PYTHONPATH=$PYTHONPATH"
+    echo "ldd oiiotool"
+    ldd $OpenImageIO_ROOT/bin/oiiotool
+fi
+
+if [[ "${SKIP_TESTS:=0}" == "0" ]] ; then
+    $OpenImageIO_ROOT/bin/oiiotool --help || true
+    TESTSUITE_CLEANUP_ON_SUCCESS=1
+    echo "Parallel test " ${CTEST_PARALLEL_LEVEL}
+    # make $BUILD_FLAGS test
+    pushd build/$PLATFORM
+    ctest -C ${CMAKE_BUILD_TYPE} -E broken --force-new-ctest-process --output-on-failure
     popd
-else
-    make $MAKEFLAGS VERBOSE=1 $BUILD_FLAGS config
-    make $MAKEFLAGS $PAR_MAKEFLAGS $BUILD_FLAGS $BUILDTARGET
-fi
-
-echo "OpenImageIO_ROOT $OpenImageIO_ROOT"
-ls -R -l "$OpenImageIO_ROOT"
-
-if [[ -e ./build/$PLATFORM/src/include/export.h ]] ; then
-    echo "export.h is:"
-    cat ./build/$PLATFORM/src/include/export.h
-fi
-
-if [[ "$SKIP_TESTS" == "" ]] ; then
-    $OpenImageIO_ROOT/bin/oiiotool --help
-    make $BUILD_FLAGS test
 fi
 
 if [[ "$BUILDTARGET" == clang-format ]] ; then
@@ -58,6 +68,6 @@ if [[ "$BUILDTARGET" == clang-format ]] ; then
     fi
 fi
 
-if [[ "$CODECOV" == 1 ]] ; then
-    bash <(curl -s https://codecov.io/bash)
-fi
+# if [[ "$CODECOV" == 1 ]] ; then
+#     bash <(curl -s https://codecov.io/bash)
+# fi

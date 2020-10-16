@@ -15,6 +15,7 @@
 #include <half.h>
 
 #include <OpenImageIO/argparse.h>
+#include <OpenImageIO/color.h>
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/filter.h>
@@ -603,7 +604,8 @@ write_mipmap(ImageBufAlgo::MakeTextureMode mode, std::shared_ptr<ImageBuf>& img,
     bool envlatlmode       = (mode == ImageBufAlgo::MakeTxEnvLatl);
     bool orig_was_overscan = (img->spec().x || img->spec().y || img->spec().z
                               || img->spec().full_x || img->spec().full_y
-                              || img->spec().full_z);
+                              || img->spec().full_z
+                              || img->spec().roi() != img->spec().roi_full());
     ImageSpec outspec      = outspec_template;
     outspec.set_format(outputdatatype);
 
@@ -949,15 +951,15 @@ make_texture_impl(ImageBufAlgo::MakeTextureMode mode, const ImageBuf* input,
     size_t peak_mem              = 0;
     Timer alltime;
 
-#define STATUS(task, timer)                                                    \
-    {                                                                          \
-        size_t mem = Sysutil::memory_used(true);                               \
-        peak_mem   = std::max(peak_mem, mem);                                  \
-        if (verbose)                                                           \
-            outstream << Strutil::sprintf("  %-25s %s   (%s)\n", task,         \
-                                          Strutil::timeintervalformat(timer,   \
-                                                                      2),      \
-                                          Strutil::memformat(mem));            \
+#define STATUS(task, timer)                                                  \
+    {                                                                        \
+        size_t mem = Sysutil::memory_used(true);                             \
+        peak_mem   = std::max(peak_mem, mem);                                \
+        if (verbose)                                                         \
+            outstream << Strutil::sprintf("  %-25s %s   (%s)\n", task,       \
+                                          Strutil::timeintervalformat(timer, \
+                                                                      2),    \
+                                          Strutil::memformat(mem));          \
     }
 
     ImageSpec configspec = _configspec;
@@ -1236,7 +1238,7 @@ make_texture_impl(ImageBufAlgo::MakeTextureMode mode, const ImageBuf* input,
     if (channelnames.size()) {
         std::vector<std::string> newchannelnames;
         Strutil::split(channelnames, newchannelnames, ",");
-        ImageSpec& spec(src->specmod());  // writeable version
+        ImageSpec& spec(src->specmod());  // writable version
         for (int c = 0; c < spec.nchannels; ++c) {
             if (c < (int)newchannelnames.size() && newchannelnames[c].size()) {
                 std::string name     = newchannelnames[c];
@@ -1555,12 +1557,12 @@ make_texture_impl(ImageBufAlgo::MakeTextureMode mode, const ImageBuf* input,
             || Strutil::iends_with(outputfilename, ".exr")))
         do_resize = true;
 
-    if (do_resize && orig_was_overscan && out
-        && !out->supports("displaywindow")) {
-        outstream << "maketx ERROR: format " << out->format_name()
-                  << " does not support separate display windows,\n"
-                  << "              which is necessary when combining resizing"
-                  << " and an input image with overscan.";
+    if (orig_was_overscan && out && !out->supports("displaywindow")) {
+        outstream << Strutil::sprintf(
+            "maketx ERROR: format \"%s\" does not support separate display "
+            "windows, which is necessary for textures with overscan. OpenEXR "
+            " is a format that allows overscan textures.\n",
+            out->format_name());
         return false;
     }
     std::string filtername

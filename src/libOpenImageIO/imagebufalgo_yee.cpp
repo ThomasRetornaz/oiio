@@ -9,8 +9,8 @@
 #include <cmath>
 #include <iostream>
 
-#include <IlmBase/Imath/ImathColor.h>
-#include <IlmBase/Imath/ImathFun.h>
+#include <ImathColor.h>
+#include <ImathFun.h>
 using Imath::Color3f;
 
 #include <OpenImageIO/dassert.h>

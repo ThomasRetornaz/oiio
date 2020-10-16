@@ -10,7 +10,6 @@
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/strutil.h>
-#include <OpenImageIO/thread.h>
 #include <OpenImageIO/tiffutils.h>
 
 extern "C" {
@@ -20,7 +19,7 @@ extern "C" {
 #if USE_EXTERNAL_PUGIXML
 #    include <pugixml.hpp>
 #else
-#    include <OpenImageIO/pugixml.hpp>
+#    include <OpenImageIO/detail/pugixml/pugixml.hpp>
 #endif
 
 #define DEBUG_XMP_READ 0

@@ -304,6 +304,11 @@ ImageCacheFile::ImageCacheFile(ImageCacheImpl& imagecache,
                  || m_filename.find("<u>") != m_filename.npos
                  || m_filename.find("<v>") != m_filename.npos)
                 && !Filesystem::exists(m_filename);
+
+    // If the config has an IOProxy, remember that we should never actually
+    // release() it, because the proxy can't be reopened.
+    if (config && config->find_attribute("oiio:ioproxy", TypeDesc::PTR))
+        m_allow_release = false;
 }
 
 
@@ -828,7 +833,7 @@ ImageCacheFile::read_tile(ImageCachePerThreadInfo* thread_info, int subimage,
     if (!ok) {
         std::string err = inp->geterror();
         if (!err.empty() && errors_should_issue())
-            imagecache().errorf("%s", err);
+            imagecache().error("{}", err);
     }
 
     if (ok) {
@@ -982,7 +987,7 @@ ImageCacheFile::read_untiled(ImageCachePerThreadInfo* thread_info,
         if (!ok) {
             std::string err = inp->geterror();
             if (!err.empty() && errors_should_issue())
-                imagecache().errorf("%s", err);
+                imagecache().error("{}", err);
         }
         size_t b = (y1 - y0 + 1) * spec.scanline_bytes();
         thread_info->m_stats.bytes_read += b;
@@ -1023,7 +1028,7 @@ ImageCacheFile::read_untiled(ImageCachePerThreadInfo* thread_info,
         if (!ok) {
             std::string err = inp->geterror();
             if (!err.empty() && errors_should_issue())
-                imagecache().errorf("%s", err);
+                imagecache().error("{}", err);
         }
         size_t b = spec.image_bytes();
         thread_info->m_stats.bytes_read += b;
@@ -1060,7 +1065,7 @@ ImageCacheFile::release()
     m_mutex_wait_time += input_mutex_timer();
     if (m_used)
         m_used = false;
-    else
+    else if (m_allow_release)
         close();
 }
 
@@ -1151,7 +1156,7 @@ ImageCacheFile::mark_broken(string_view error)
     if (!error.size())
         error = string_view("unknown error");
     m_broken_message = error;
-    imagecache().errorf("%s", error);
+    imagecache().error("{}", error);
     invalidate_spec();
 }
 
@@ -1515,8 +1520,8 @@ ImageCacheTile::read(ImageCachePerThreadInfo* thread_info)
         // (! m_valid)
         m_used = false;  // Don't let it hold mem if invalid
         if (file.mod_time() != Filesystem::last_write_time(file.filename()))
-            file.imagecache().errorf(
-                "File \"%s\" was modified after being opened by OIIO",
+            file.imagecache().error(
+                "File \"{}\" was modified after being opened by OIIO",
                 file.filename());
 #if 0
         std::cerr << "(1) error reading tile " << m_id.x() << ' ' << m_id.y()
@@ -1788,12 +1793,12 @@ ImageCacheImpl::getstats(int level) const
         out << ") ver " << OIIO_VERSION_STRING << "\n";
 
         std::string opt;
-#define BOOLOPT(name)                                                          \
-    if (m_##name)                                                              \
+#define BOOLOPT(name) \
+    if (m_##name)     \
     opt += #name " "
 #define INTOPT(name) opt += Strutil::sprintf(#name "=%d ", m_##name)
-#define STROPT(name)                                                           \
-    if (m_##name.size())                                                       \
+#define STROPT(name)     \
+    if (m_##name.size()) \
     opt += Strutil::sprintf(#name "=\"%s\" ", m_##name)
         opt += Strutil::sprintf("max_memory_MB=%0.1f ",
                                 m_max_memory_bytes / (1024.0 * 1024.0));
@@ -2189,10 +2194,10 @@ ImageCacheImpl::attribute(string_view name, TypeDesc type, const void* val)
 bool
 ImageCacheImpl::getattribute(string_view name, TypeDesc type, void* val) const
 {
-#define ATTR_DECODE(_name, _ctype, _src)                                       \
-    if (name == _name && type == BaseTypeFromC<_ctype>::value) {               \
-        *(_ctype*)(val) = (_ctype)(_src);                                      \
-        return true;                                                           \
+#define ATTR_DECODE(_name, _ctype, _src)                         \
+    if (name == _name && type == BaseTypeFromC<_ctype>::value) { \
+        *(_ctype*)(val) = (_ctype)(_src);                        \
+        return true;                                             \
     }
 
     ATTR_DECODE("max_open_files", int, m_max_open_files);
@@ -2355,22 +2360,7 @@ void
 ImageCacheImpl::add_tile_to_cache(ImageCacheTileRef& tile,
                                   ImageCachePerThreadInfo* thread_info)
 {
-    bool ourtile = true;
-    {
-        // Protect us from using too much memory if another thread added the
-        // same tile just before us
-        if (m_tilecache.retrieve(tile->id(), tile)) {
-            // Already added!  Use the other one, discard ours. And the
-            // call to retrieve just changed 'tile' to point to the one
-            // already in the table.
-            ourtile = false;
-        } else {
-            // It wasn't in the cache already. Add ours.
-            // N.B. at this time, we do not hold any locks.
-            check_max_mem(thread_info);
-            m_tilecache.insert(tile->id(), tile);
-        }
-    }
+    bool ourtile = m_tilecache.insert_retrieve(tile->id(), tile, tile);
 
     // If we added a new tile to the cache, we may still need to read the
     // pixels; and if we found the tile in cache, we may need to wait for
@@ -2383,6 +2373,7 @@ ImageCacheImpl::add_tile_to_cache(ImageCacheTileRef& tile,
             thread_info->m_stats.fileio_time += readtime;
             tile->id().file().iotime() += readtime;
         }
+        check_max_mem(thread_info);
     } else {
         // Somebody else already added the tile to the cache before we
         // could, so we'll use their reference, but we need to wait until it
@@ -2516,7 +2507,7 @@ ImageCacheImpl::get_image_info(ustring filename, int subimage, int miplevel,
     ImageCachePerThreadInfo* thread_info = get_perthread_info();
     ImageCacheFile* file = find_file(filename, thread_info, nullptr);
     if (!file && dataname != s_exists) {
-        errorf("Invalid image file \"%s\"", filename);
+        error("Invalid image file \"{}\"", filename);
         return false;
     }
     return get_image_info(file, thread_info, subimage, miplevel, dataname,
@@ -2531,10 +2522,10 @@ ImageCacheImpl::get_image_info(ImageCacheFile* file,
                                int subimage, int miplevel, ustring dataname,
                                TypeDesc datatype, void* data)
 {
-#define ATTR_DECODE(_name, _ctype, _src)                                       \
-    if (dataname == _name && datatype == BaseTypeFromC<_ctype>::value) {       \
-        *(_ctype*)(data) = (_ctype)(_src);                                     \
-        return true;                                                           \
+#define ATTR_DECODE(_name, _ctype, _src)                                 \
+    if (dataname == _name && datatype == BaseTypeFromC<_ctype>::value) { \
+        *(_ctype*)(data) = (_ctype)(_src);                               \
+        return true;                                                     \
     }
 
     if (!thread_info)
@@ -2580,8 +2571,8 @@ ImageCacheImpl::get_image_info(ImageCacheFile* file,
             std::string* errptr = m_errormessage.get();
             if (errptr)
                 errptr->clear();
-            errorf("Invalid image file \"%s\": %s", file->filename(),
-                   file->broken_error_message());
+            error("Invalid image file \"{}\": {}", file->filename(),
+                  file->broken_error_message());
         }
         return false;
     }
@@ -2631,14 +2622,14 @@ ImageCacheImpl::get_image_info(ImageCacheFile* file,
     // reference to the spec.
     if (subimage < 0 || subimage >= file->subimages()) {
         if (file->errors_should_issue())
-            errorf("Unknown subimage %d (out of %d)", subimage,
-                   file->subimages());
+            error("Unknown subimage {} (out of {})", subimage,
+                  file->subimages());
         return false;
     }
     if (miplevel < 0 || miplevel >= file->miplevels(subimage)) {
         if (file->errors_should_issue())
-            errorf("Unknown mip level %d (out of %d)", miplevel,
-                   file->miplevels(subimage));
+            error("Unknown mip level {} (out of {})", miplevel,
+                  file->miplevels(subimage));
         return false;
     }
 
@@ -2822,7 +2813,7 @@ ImageCacheImpl::imagespec(ustring filename, int subimage, int miplevel,
     ImageCachePerThreadInfo* thread_info = get_perthread_info();
     ImageCacheFile* file = find_file(filename, thread_info, nullptr);
     if (!file) {
-        errorf("Image file \"%s\" not found", filename);
+        error("Image file \"{}\" not found", filename);
         return NULL;
     }
     return imagespec(file, thread_info, subimage, miplevel, native);
@@ -2844,8 +2835,8 @@ ImageCacheImpl::imagespec(ImageCacheFile* file,
     file = verify_file(file, thread_info, true);
     if (file->broken()) {
         if (file->errors_should_issue())
-            errorf("Invalid image file \"%s\": %s", file->filename(),
-                   file->broken_error_message());
+            error("Invalid image file \"{}\": {}", file->filename(),
+                  file->broken_error_message());
         return NULL;
     }
     if (file->is_udim()) {
@@ -2854,14 +2845,14 @@ ImageCacheImpl::imagespec(ImageCacheFile* file,
     }
     if (subimage < 0 || subimage >= file->subimages()) {
         if (file->errors_should_issue())
-            errorf("Unknown subimage %d (out of %d)", subimage,
-                   file->subimages());
+            error("Unknown subimage {} (out of {})", subimage,
+                  file->subimages());
         return NULL;
     }
     if (miplevel < 0 || miplevel >= file->miplevels(subimage)) {
         if (file->errors_should_issue())
-            errorf("Unknown mip level %d (out of %d)", miplevel,
-                   file->miplevels(subimage));
+            error("Unknown mip level {} (out of {})", miplevel,
+                  file->miplevels(subimage));
         return NULL;
     }
     const ImageSpec* spec = native ? &file->nativespec(subimage, miplevel)
@@ -2918,7 +2909,7 @@ ImageCacheImpl::get_pixels(ustring filename, int subimage, int miplevel,
     ImageCachePerThreadInfo* thread_info = get_perthread_info();
     ImageCacheFile* file                 = find_file(filename, thread_info);
     if (!file) {
-        errorf("Image file \"%s\" not found", filename);
+        error("Image file \"{}\" not found", filename);
         return false;
     }
     return get_pixels(file, thread_info, subimage, miplevel, xbegin, xend,
@@ -2943,8 +2934,8 @@ ImageCacheImpl::get_pixels(ImageCacheFile* file,
     file = verify_file(file, thread_info);
     if (file->broken()) {
         if (file->errors_should_issue())
-            errorf("Invalid image file \"%s\": %s", file->filename(),
-                   file->broken_error_message());
+            error("Invalid image file \"{}\": {}", file->filename(),
+                  file->broken_error_message());
         return false;
     }
     if (file->is_udim()) {
@@ -2953,14 +2944,14 @@ ImageCacheImpl::get_pixels(ImageCacheFile* file,
     }
     if (subimage < 0 || subimage >= file->subimages()) {
         if (file->errors_should_issue())
-            errorf("get_pixels asked for nonexistent subimage %d of \"%s\"",
-                   subimage, file->filename());
+            error("get_pixels asked for nonexistent subimage {} of \"{}\"",
+                  subimage, file->filename());
         return false;
     }
     if (miplevel < 0 || miplevel >= file->miplevels(subimage)) {
         if (file->errors_should_issue())
-            errorf("get_pixels asked for nonexistent MIP level %d of \"%s\"",
-                   miplevel, file->filename());
+            error("get_pixels asked for nonexistent MIP level {} of \"{}\"",
+                  miplevel, file->filename());
         return false;
     }
 

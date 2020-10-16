@@ -20,7 +20,9 @@ lg@openimageio.org
 * Basileios Anastasatos
 * Bastien Montagne
 * Ben De Luca
+* Biswapriyo Nath
 * Blair Tennessy
+* Blazej Floch
 * Brecht Van Lommel
 * Brent Davis
 * Brian Hall
@@ -45,10 +47,12 @@ lg@openimageio.org
 * Dinko Galetik
 * Dominik Bartkiewicz
 * Duncan Chan
+* Dustin Rodrigues
 * Edgar Velazquez-Armendariz
 * Eloi Du Bois
 * Elvic Liang
 * Fabien Castan
+* Fabien Servant
 * Frédéric Devernay
 * Fredrik Averpil
 * Ghislain Antony Vaillant
@@ -61,10 +65,12 @@ lg@openimageio.org
 * Henri Fousse
 * Harry Mallon
 * Hugh Macdonald
+* Imarz
 * Irena Damsky
 * Ismael Cortes
 * Jep Hill
 * Jeph Alapat
+* Jens Lindgren
 * Jeremy Rose
 * Jeremy Selan
 * Jim Hourihan
@@ -107,6 +113,7 @@ lg@openimageio.org
 * Nandan Dubey
 * Nathan Rusch
 * Nicholas Yue
+* Nick Black
 * Nicolas Burtnyk
 * Nixon Kwok
 * Nuno Cardoso
@@ -119,6 +126,7 @@ lg@openimageio.org
 * Philip Nemec
 * Pino Toscano
 * Puneet Jain
+* Radu Arjocu
 * Ramon Montoya
 * Ray Molenkamp
 * Richard Shaw

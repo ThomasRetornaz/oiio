@@ -11,13 +11,11 @@
 #include <ImathMatrix.h>
 
 #include <OpenImageIO/dassert.h>
-#include <OpenImageIO/filter.h>
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imagecache.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/strutil.h>
 #include <OpenImageIO/texture.h>
-#include <OpenImageIO/thread.h>
 #include <OpenImageIO/typedesc.h>
 #include <OpenImageIO/ustring.h>
 #include <OpenImageIO/varyingref.h>
@@ -109,7 +107,7 @@ TextureSystemImpl::texture3d(TextureHandle* texture_handle_,
 #if 0
     // FIXME: currently, no support of actual MIPmapping.  No rush,
     // since the only volume format we currently support, Field3D,
-    // doens't support MIPmapping.
+    // doesn't support MIPmapping.
     static const texture3d_lookup_prototype lookup_functions[] = {
         // Must be in the same order as Mipmode enum
         &TextureSystemImpl::texture3d_lookup,
@@ -141,8 +139,8 @@ TextureSystemImpl::texture3d(TextureHandle* texture_handle_,
         int s = m_imagecache->subimage_from_name(texturefile,
                                                  options.subimagename);
         if (s < 0) {
-            errorf("Unknown subimage \"%s\" in texture \"%s\"",
-                   options.subimagename, texturefile->filename());
+            error("Unknown subimage \"{}\" in texture \"{}\"",
+                  options.subimagename, texturefile->filename());
             return missing_texture(options, nchannels, result, dresultds,
                                    dresultdt, dresultdr);
         }
@@ -150,8 +148,8 @@ TextureSystemImpl::texture3d(TextureHandle* texture_handle_,
         options.subimagename.clear();
     }
     if (options.subimage < 0 || options.subimage >= texturefile->subimages()) {
-        errorf("Unknown subimage \"%s\" in texture \"%s\"",
-               options.subimagename, texturefile->filename());
+        error("Unknown subimage \"{}\" in texture \"{}\"", options.subimagename,
+              texturefile->filename());
         return missing_texture(options, nchannels, result, dresultds, dresultdt,
                                dresultdr);
     }
@@ -336,7 +334,7 @@ TextureSystemImpl::accum3d_sample_closest(
     float s = P[0] * spec.full_width + spec.full_x;
     float t = P[1] * spec.full_height + spec.full_y;
     float r = P[2] * spec.full_depth + spec.full_z;
-    int stex, ttex, rtex;       // Texel coordintes
+    int stex, ttex, rtex;       // Texel coordinates
     (void)floorfrac(s, &stex);  // don't need fractional result
     (void)floorfrac(t, &ttex);
     (void)floorfrac(r, &rtex);
@@ -372,7 +370,7 @@ TextureSystemImpl::accum3d_sample_closest(
               ttex - tile_t, rtex - tile_r, tile_chbegin, tile_chend);
     bool ok = find_tile(id, thread_info, true);
     if (!ok)
-        errorf("%s", m_imagecache->geterror());
+        error("{}", m_imagecache->geterror());
     TileRef& tile(thread_info->tile);
     if (!tile || !ok)
         return false;
@@ -520,7 +518,7 @@ TextureSystemImpl::accum3d_sample_bilinear(
         id.xyz(stex[0] - tile_s, ttex[0] - tile_t, rtex[0] - tile_r);
         bool ok = find_tile(id, thread_info, true);
         if (!ok)
-            errorf("%s", m_imagecache->geterror());
+            error("{}", m_imagecache->geterror());
         TileRef& tile(thread_info->tile);
         if (!tile->valid())
             return false;
@@ -557,7 +555,7 @@ TextureSystemImpl::accum3d_sample_bilinear(
                            rtex[k] - tile_r);
                     bool ok = find_tile(id, thread_info, firstsample);
                     if (!ok)
-                        errorf("%s", m_imagecache->geterror());
+                        error("{}", m_imagecache->geterror());
                     firstsample = false;
                     TileRef& tile(thread_info->tile);
                     if (!tile->valid())

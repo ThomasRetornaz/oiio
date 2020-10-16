@@ -19,7 +19,6 @@
 
 #include <OpenImageIO/argparse.h>
 #include <OpenImageIO/deepdata.h>
-#include <OpenImageIO/fmath.h>
 #include <OpenImageIO/hash.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
@@ -56,7 +55,10 @@ compute_sha1(Oiiotool& ot, ImageInput* input)
         // Special handling of deep data
         DeepData dd;
         if (!input->read_native_deep_image(dd)) {
-            ot.error("-info", "SHA-1: unable to compute, could not read image");
+            std::string err = input->geterror();
+            if (err.empty())
+                err = "could not read image";
+            ot.errorf("-info", "SHA-1: %s", err);
             return std::string();
         }
         // Hash both the sample counts and the data block
@@ -65,13 +67,15 @@ compute_sha1(Oiiotool& ot, ImageInput* input)
     } else {
         imagesize_t size = input->spec().image_bytes(true /*native*/);
         if (size >= std::numeric_limits<size_t>::max()) {
-            ot.error("-info", "SHA-1: unable to compute, image is too big");
+            ot.errorf("-info", "SHA-1: unable to compute, image is too big");
             return std::string();
         } else if (size != 0) {
             std::unique_ptr<char[]> buf(new char[size]);
             if (!input->read_image(TypeDesc::UNKNOWN /*native*/, &buf[0])) {
-                ot.error("-info",
-                         "SHA-1: unable to compute, could not read image");
+                std::string err = input->geterror();
+                if (err.empty())
+                    err = "could not read image";
+                ot.errorf("-info", "SHA-1: %s", err);
                 return std::string();
             }
             sha.append(&buf[0], size);
@@ -157,18 +161,18 @@ dump_flat_data(ImageInput* input, const print_info_options& opt)
 
 
 // Macro to call a type-specialzed version func<type>(R,...)
-#define OIIO_DISPATCH_TYPES(ret, name, func, type, R, ...)                     \
-    switch (type.basetype) {                                                   \
-    case TypeDesc::FLOAT: ret = func<float>(R, __VA_ARGS__); break;            \
-    case TypeDesc::UINT8: ret = func<unsigned char>(R, __VA_ARGS__); break;    \
-    case TypeDesc::HALF: ret = func<half>(R, __VA_ARGS__); break;              \
-    case TypeDesc::UINT16: ret = func<unsigned short>(R, __VA_ARGS__); break;  \
-    case TypeDesc::INT8: ret = func<char>(R, __VA_ARGS__); break;              \
-    case TypeDesc::INT16: ret = func<short>(R, __VA_ARGS__); break;            \
-    case TypeDesc::UINT: ret = func<unsigned int>(R, __VA_ARGS__); break;      \
-    case TypeDesc::INT: ret = func<int>(R, __VA_ARGS__); break;                \
-    case TypeDesc::DOUBLE: ret = func<double>(R, __VA_ARGS__); break;          \
-    default: ret = false;                                                      \
+#define OIIO_DISPATCH_TYPES(ret, name, func, type, R, ...)                    \
+    switch (type.basetype) {                                                  \
+    case TypeDesc::FLOAT: ret = func<float>(R, __VA_ARGS__); break;           \
+    case TypeDesc::UINT8: ret = func<unsigned char>(R, __VA_ARGS__); break;   \
+    case TypeDesc::HALF: ret = func<half>(R, __VA_ARGS__); break;             \
+    case TypeDesc::UINT16: ret = func<unsigned short>(R, __VA_ARGS__); break; \
+    case TypeDesc::INT8: ret = func<char>(R, __VA_ARGS__); break;             \
+    case TypeDesc::INT16: ret = func<short>(R, __VA_ARGS__); break;           \
+    case TypeDesc::UINT: ret = func<unsigned int>(R, __VA_ARGS__); break;     \
+    case TypeDesc::INT: ret = func<int>(R, __VA_ARGS__); break;               \
+    case TypeDesc::DOUBLE: ret = func<double>(R, __VA_ARGS__); break;         \
+    default: ret = false;                                                     \
     }
 
 

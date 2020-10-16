@@ -77,7 +77,7 @@ public:
             /// the ImageBuf is destroyed.
         IMAGECACHE
             ///< The ImageBuf is "backed" by an ImageCache, which will
-            /// automatically be used to retreive pixels when requested, but
+            /// automatically be used to retrieve pixels when requested, but
             /// the ImageBuf will not allocate separate storage for it. 
             /// This brings all the advantages of the ImageCache, but can
             /// only be used for read-only ImageBuf's that reference a
@@ -134,7 +134,7 @@ public:
     // Deprecated synonym for `ImageBuf(name, 0, 0, imagecache, nullptr)`.
     ImageBuf(string_view name, ImageCache* imagecache);
 
-    /// Construct a writeable ImageBuf with the given specification
+    /// Construct a writable ImageBuf with the given specification
     /// (including resolution, data type, metadata, etc.). The ImageBuf will
     /// allocate and own its own pixel memory and will free that memory
     /// automatically upon destruction, clear(), or reset(). Upon successful
@@ -148,7 +148,7 @@ public:
     ///             state and will have no local pixel storage.
     /// @param zero
     ///             After a successful allocation of the local pixel
-    ///             storage, this parameteter controls whether the pixels
+    ///             storage, this parameter controls whether the pixels
     ///             will be initialized to hold zero (black) values
     ///             (`InitializePixels::Yes`) or if the pixel memory will
     ///             remain uninitialized (`InitializePixels::No`) and thus
@@ -165,7 +165,7 @@ public:
     ImageBuf(string_view name, const ImageSpec& spec,
              InitializePixels zero = InitializePixels::Yes);
 
-    /// Construct a writeable ImageBuf that "wraps" existing pixel memory
+    /// Construct a writable ImageBuf that "wraps" existing pixel memory
     /// owned by the calling application. The ImageBuf does not own the
     /// pixel storage and will will not free/delete that memory, even when
     /// the ImageBuf is destroyed. Upon successful initialization, the
@@ -204,7 +204,7 @@ public:
     /// `IBStorage::UNINITIALIZED`).
     void reset() { clear(); }
 
-    // Deprecated/useless synonym for `reset(name, 0, 0, imageache, nullptr)`
+    // Deprecated/useless synonym for `reset(name, 0, 0, imagecache, nullptr)`
     void reset(string_view name, ImageCache* imagecache = nullptr);
 
     /// Destroy any previous contents of the ImageBuf and re-initialize it
@@ -239,7 +239,7 @@ public:
     /// pixel memory owned by the calling application.
     void reset(const ImageSpec& spec, void* buffer);
 
-    /// Make the ImageBuf be writeable. That means that if it was previously
+    /// Make the ImageBuf be writable. That means that if it was previously
     /// backed by an ImageCache (storage was `IMAGECACHE`), it will force a
     /// full read so that the whole image is in local memory. This will
     /// invalidate any current iterators on the image. It has no effect if
@@ -249,11 +249,15 @@ public:
     ///             If true, preserve any ImageCache-forced data types (you
     ///             might want to do this if it is critical that the
     ///             apparent data type doesn't change, for example if you
-    ///             are calling `make_writeable()` from within a
+    ///             are calling `make_writable()` from within a
     ///             type-specialized function).
     /// @returns
     ///             Return `true` if it works (including if no read was
     ///             necessary), `false` if something went horribly wrong.
+    bool make_writable(bool keep_cache_type = false);
+
+    // DEPRECATED(2.2): This is an alternate, and less common, spelling.
+    // Let's standardize on "writable". We will eventually remove this.
     bool make_writeable(bool keep_cache_type = false);
 
     /// @}
@@ -472,7 +476,7 @@ public:
     /// be a scanline-oriented file.
     ///
     /// This lets you write a tiled file from an ImageBuf that may have been
-    /// read orginally from a scanline file, or change the dimensions of a
+    /// read originally from a scanline file, or change the dimensions of a
     /// tiled file, or to force the file written to be scanline even if it
     /// was originally read from a tiled file.
     ///
@@ -492,11 +496,17 @@ public:
     /// ImageOutput must have already been opened with a spec that indicates
     /// a resolution identical to that of this ImageBuf (but it may have
     /// specified a different pixel data type, in which case data
-    /// conversions will happen automatically).
+    /// conversions will happen automatically). This method does NOT close
+    /// the file when it's done (and so may be called in a loop to write a
+    /// multi-image file).
     ///
     /// Note that since this uses an already-opened `ImageOutput`, which is
     /// too late to change how it was opened, it does not honor any prior
     /// calls to `set_write_format` or `set_write_tiles`.
+    ///
+    /// The main application of this method is to allow an ImageBuf (which
+    /// by design may hold only a *single* image) to be used for the output
+    /// of one image of a multi-subimage and/or MIP-mapped image file.
     ///
     /// @param  out
     ///             A pointer to an already-opened `ImageOutput` to which
@@ -508,8 +518,7 @@ public:
     ///             which allows you to implement some sort of progress
     ///             meter.
     /// @returns  `true` if all went ok, `false` if there were errors
-    ///           writing.  It does NOT close the file when it's done (and
-    ///           so may be called in a loop to write a multi-image file).
+    ///           writing.
     bool write(ImageOutput* out, ProgressCallback progress_callback = nullptr,
                void* progress_callback_data = nullptr) const;
 
@@ -639,12 +648,12 @@ public:
     /// the upper left corner of the display window, (1,1) the lower
     /// right corner of the display window.
     ///
-    /// @note `interppixel()` uses pixel coordiantes (ranging 0..resolution)
-    /// whereas `interppixel_NDC()` uses NDC coordiantes (ranging 0..1).
+    /// @note `interppixel()` uses pixel coordinates (ranging 0..resolution)
+    /// whereas `interppixel_NDC()` uses NDC coordinates (ranging 0..1).
     void interppixel_NDC(float s, float t, float* pixel,
                          WrapMode wrap = WrapBlack) const;
 
-    // DEPCRECATED (1.5) synonym for interppixel_NDC.
+    // DEPRECATED (1.5) synonym for interppixel_NDC.
     void interppixel_NDC_full(float s, float t, float* pixel,
                               WrapMode wrap = WrapBlack) const;
 
@@ -652,7 +661,7 @@ public:
     void interppixel_bicubic(float x, float y, float* pixel,
                              WrapMode wrap = WrapBlack) const;
 
-    /// Bicubic interpolattion at NDC space coordinates (s,t), where (0,0)
+    /// Bicubic interpolation at NDC space coordinates (s,t), where (0,0)
     /// is the upper left corner of the display (a.k.a. "full") window,
     /// (1,1) the lower right corner of the display window.
     void interppixel_bicubic_NDC(float s, float t, float* pixel,
@@ -931,7 +940,7 @@ public:
     /// Error reporting for ImageBuf: call this with Python / {fmt} /
     /// std::format style formatting specification.
     template<typename... Args>
-    void fmterror(const char* fmt, const Args&... args) const
+    void errorfmt(const char* fmt, const Args&... args) const
     {
         error(Strutil::fmt::format(fmt, args...));
     }
@@ -951,6 +960,15 @@ public:
     void error(const char* fmt, const Args&... args) const
     {
         error(Strutil::format(fmt, args...));
+    }
+
+    // Error reporting for ImageBuf: call this with Python / {fmt} /
+    // std::format style formatting specification.
+    template<typename... Args>
+    OIIO_DEPRECATED("use `errorfmt` instead")
+    void fmterror(const char* fmt, const Args&... args) const
+    {
+        error(Strutil::fmt::format(fmt, args...));
     }
 
     /// Returns `true` if the ImageBuf has had an error and has an error
@@ -1376,11 +1394,11 @@ public:
             m_z     = m_rng_zend;
         }
 
-        // Make sure it's writeable. Use with caution!
-        void make_writeable()
+        // Make sure it's writable. Use with caution!
+        void make_writable()
         {
             if (!m_localpixels) {
-                const_cast<ImageBuf*>(m_ib)->make_writeable(true);
+                const_cast<ImageBuf*>(m_ib)->make_writable(true);
                 OIIO_DASSERT(m_ib->storage() != IMAGECACHE);
                 m_tile      = nullptr;
                 m_proxydata = nullptr;
@@ -1415,7 +1433,7 @@ public:
         Iterator(ImageBuf& ib, WrapMode wrap = WrapDefault)
             : IteratorBase(ib, wrap)
         {
-            make_writeable();
+            make_writable();
             pos(m_rng_xbegin, m_rng_ybegin, m_rng_zbegin);
             if (m_rng_xbegin == m_rng_xend || m_rng_ybegin == m_rng_yend
                 || m_rng_zbegin == m_rng_zend)
@@ -1427,14 +1445,14 @@ public:
                  WrapMode wrap = WrapDefault)
             : IteratorBase(ib, wrap)
         {
-            make_writeable();
+            make_writable();
             pos(x, y, z);
         }
         /// Construct read-write iteration region from ImageBuf and ROI.
         Iterator(ImageBuf& ib, const ROI& roi, WrapMode wrap = WrapDefault)
             : IteratorBase(ib, roi, wrap)
         {
-            make_writeable();
+            make_writable();
             pos(m_rng_xbegin, m_rng_ybegin, m_rng_zbegin);
             if (m_rng_xbegin == m_rng_xend || m_rng_ybegin == m_rng_yend
                 || m_rng_zbegin == m_rng_zend)
@@ -1446,7 +1464,7 @@ public:
                  int zbegin = 0, int zend = 1, WrapMode wrap = WrapDefault)
             : IteratorBase(ib, xbegin, xend, ybegin, yend, zbegin, zend, wrap)
         {
-            make_writeable();
+            make_writable();
             pos(m_rng_xbegin, m_rng_ybegin, m_rng_zbegin);
             if (m_rng_xbegin == m_rng_xend || m_rng_ybegin == m_rng_yend
                 || m_rng_zbegin == m_rng_zend)
@@ -1457,7 +1475,7 @@ public:
         Iterator(Iterator& i)
             : IteratorBase(i.m_ib, i.m_wrap)
         {
-            make_writeable();
+            make_writable();
             pos(i.m_x, i.m_y, i.m_z);
         }
 

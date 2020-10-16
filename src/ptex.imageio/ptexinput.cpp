@@ -5,7 +5,6 @@
 #include <Ptexture.h>
 
 #include <OpenImageIO/dassert.h>
-#include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/typedesc.h>
 
@@ -106,7 +105,7 @@ PtexInput::open(const std::string& name, ImageSpec& newspec)
             m_ptex->release();
             m_ptex = NULL;
         }
-        errorf("%s", perr);
+        errorf("%s", perr.c_str());
         return false;
     }
 
@@ -191,13 +190,13 @@ PtexInput::seek_subimage(int subimage, int miplevel)
         wrapmode += "periodic";
     m_spec.attribute("wrapmode", wrapmode);
 
-#define GETMETA(pmeta, key, ptype, basetype, typedesc, value)                  \
-    {                                                                          \
-        const ptype* v;                                                        \
-        int count;                                                             \
-        pmeta->getValue(key, v, count);                                        \
-        typedesc = TypeDesc(basetype, count);                                  \
-        value    = (const void*)v;                                             \
+#define GETMETA(pmeta, key, ptype, basetype, typedesc, value) \
+    {                                                         \
+        const ptype* v;                                       \
+        int count;                                            \
+        pmeta->getValue(key, v, count);                       \
+        typedesc = TypeDesc(basetype, count);                 \
+        value    = (const void*)v;                            \
     }
 
     PtexMetaData* pmeta = m_ptex->getMetaData();

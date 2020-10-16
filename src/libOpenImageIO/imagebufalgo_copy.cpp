@@ -7,7 +7,7 @@
 /// or channels between images without altering their values.
 
 
-#include <IlmBase/Half/half.h>
+#include <half.h>
 
 #include <cmath>
 #include <iostream>

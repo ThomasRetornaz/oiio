@@ -121,8 +121,9 @@ described in detail in Section :ref:`sec-typedesc`, is replicated for Python.
 .. py:data:: TypeUnknown TypeString TypeFloat TypeHalf
              TypeInt TypeUInt TypeInt16 TypeUInt16
              TypeColor TypePoint TypeVector TypeNormal
-             TypeFloat4 TypeMatrix TypeMatrix33
-             TypeTimeCode TypeKeyCode TypeRational
+             TypeFloat2 TypeVector2 TypeFloat4 TypeVector2i
+             TypeMatrix TypeMatrix33
+             TypeTimeCode TypeKeyCode TypeRational TypePointer
 
     Pre-constructed `TypeDesc` objects for some common types, available in the
     outer OpenImageIO scope.
@@ -1014,13 +1015,13 @@ the Python versions allocate and return an array holding the pixel values
 
 
 
-.. py:method:: ImageInput.read_image (format="float")
-               ImageInput.read_image (chbegin, chend, format="float")
-               ImageInput.read_image (subimage, miplevel, chbegin, chend, format="float")
+.. py:method:: ImageInput.read_image (format='float')
+               ImageInput.read_image (chbegin, chend, format='float')
+               ImageInput.read_image (subimage, miplevel, chbegin, chend, format='float')
 
     Read the entire image and return the pixels as a NumPy array of values
-    of the given `type` (described by a `TypeDesc` or a string, float by
-    default). If the `type` is `TypeUnknown`, the pixels will be returned in
+    of the given `format` (described by a `TypeDesc` or a string, float by
+    default). If the `format` is `unknown`, the pixels will be returned in
     the native format of the file. If an error occurs, `None` will be
     returned.
     
@@ -1272,7 +1273,7 @@ ImageOutput class APIs. The Python APIs are very similar.
 .. py:method:: ImageOutput.open (filename, spec, mode="Create")
 
     Opens the named output file, with an ImageSpec describing the image to
-    be output.  The `mode` may be one of "create", "AppendSubimage", or
+    be output.  The `mode` may be one of "Create", "AppendSubimage", or
     "AppendMIPLevel". See Section :ref:`sec-imageoutput-class-reference` for
     details. Returns `True` upon success, `False` upon failure (error
     messages retrieved via `ImageOutput.geterror()`.)
@@ -1528,7 +1529,7 @@ awaiting a call to `reset()` or `copy()` before it is useful.
 
 .. py:method:: ImageBuf (imagespec, zero = True)
 
-    Construct a writeable ImageBuf of the dimensions and data format
+    Construct a writable ImageBuf of the dimensions and data format
     specified by an ImageSpec. The pixels will be initialized to black/empty
     values if `zero` is True, otherwise the pixel values will remain
     uninitialized.
@@ -1568,7 +1569,7 @@ awaiting a call to `reset()` or `copy()` before it is useful.
 
 .. py:method:: ImageBuf.reset (imagespec, zero = True)
 
-    Restore the ImageBuf to the newly-constructed state of a writeable
+    Restore the ImageBuf to the newly-constructed state of a writable
     ImageBuf specified by an ImageSpec. The pixels will be iniialized to
     black/empty if `zero` is True, otherwise the pixel values will remain
     uninitialized.
@@ -1641,9 +1642,28 @@ awaiting a call to `reset()` or `copy()` before it is useful.
 
 
 
-.. py:method:: ImageBuf.make_writeable (keep_cache_type = False)
+.. py:method:: ImageBuf.write (imageoutput)
 
-    Force the ImageBuf to be writeable. That means that if it was previously
+    Write the contents of the ImageBuf as the next subimage to an open
+    ImageOutput.
+
+    Example:
+
+    .. code-block:: python
+
+        buf = ImageBuf (...)   # Existing ImageBuf
+
+        out = ImageOutput.create("out.exr")
+        out.open ("out.exr", buf.spec())
+
+        buf.write (out)
+        out.close()
+
+
+
+.. py:method:: ImageBuf.make_writable (keep_cache_type = False)
+
+    Force the ImageBuf to be writable. That means that if it was previously
     backed by an ImageCache (storage was `IMAGECACHE`), it will force a full
     read so that the whole image is in local memory.
 
@@ -1692,7 +1712,7 @@ awaiting a call to `reset()` or `copy()` before it is useful.
 
 .. py:method:: ImageBuf.specmod()
 
-    `ImageBuf.specmod()` provides a reference to the writeable ImageSpec
+    `ImageBuf.specmod()` provides a reference to the writable ImageSpec
     inside the ImageBuf.  Be very careful!  It is safe to modify certain
     metadata, but if you change the data format or resolution fields, you
     will get the chaos you deserve.
@@ -1809,7 +1829,7 @@ awaiting a call to `reset()` or `copy()` before it is useful.
 .. py:attribute:: ImageBuf.pixels_valid
 
     Will be `True` if the file has already been read and the pixels are
-    valid. (It is always `True` for writeable ImageBuf's.) There should be
+    valid. (It is always `True` for writable ImageBuf's.) There should be
     few good reasons to access these, since the spec and pixels will be
     automatically be read when they are needed.
 
@@ -3019,7 +3039,39 @@ Image comparison and statistics
         roi.chend = min (3, roi.chend)  # only test RGB, not alpha
         if ImageBufAlgo.isMonochrome (A, roi) :
             print "a.exr is really grayscale"
-    
+
+
+
+.. py:method:: bool ImageBufAlgo.color_range_check (src, low, high, roi=ROI.All, nthreads=0)
+
+    Count how many pixels in the `src` image (within the `roi`) are outside
+    the value range described by `low` and `hi` (which each may be either
+    one value or a tuple with per-channel values for each of `roi.chbegin
+    ... roi.chend`. The result returned is a tuple containing three values:
+    the number of values less than `low`, the number of values greater then
+    `hi`, and the number of values within the range.
+
+    Example:
+
+    .. code-block:: python
+
+        A = ImageBuf ("a.exr")
+        counts = ImageBufAlgo.color_range_check (A, 0.5, 0.75)
+        print ('{} values < 0.5, {} values > 0.75'.format(counts[0], counts[1])
+
+
+
+.. py:method:: ROI ImageBufAlgo.nonzero_region (src, roi=ROI.All, nthreads=0)
+
+    Returns an ROI that tightly encloses the minimal region within `roi`
+    that contains all pixels with nonzero values.
+
+    Example:
+
+    .. code-block:: python
+
+        A = ImageBuf ("a.exr")
+        nonzero_roi = ImageBufAlgo.nonzero_region(A)
 
 
 
@@ -3795,3 +3847,21 @@ add an alpha channel that is 1 everywhere**
     comp = ImageBufAlgo.over (fg, bg)
     write_image (comp, "composite.exr")
 
+
+|
+
+**Write multiple ImageBufs into one multi-subimage file**
+
+.. code-block:: python
+
+    bufs = (...)   # Suppose that bufs is a tuple of ImageBuf
+    specs = (...)  # specs is a tuple of the specs that describe them
+
+    # Open with intent to write the subimages
+    out = ImageOutput.create ("multipart.exr")
+    out.open ("multipart.exr", specs)
+    for s in range(len(bufs)) :
+        if s > 0 :
+            out.open ("multipart.exr", specs[s], "AppendSubimage")
+        bufs[s].write (out)
+    out.close ()

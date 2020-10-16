@@ -51,7 +51,7 @@ namespace {
 static std::mutex output_mutex;
 
 // On systems that support it, get a location independent locale.
-#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)           \
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) \
     || defined(__FreeBSD_kernel__) || defined(__GLIBC__)
 static locale_t c_loc = newlocale(LC_ALL_MASK, "C", nullptr);
 #elif defined(_WIN32)
@@ -264,7 +264,13 @@ bool
 Strutil::get_rest_arguments(const std::string& str, std::string& base,
                             std::map<std::string, std::string>& result)
 {
-    std::string::size_type mark_pos = str.find_first_of("?");
+    // Disregard the Windows long path question style prefix "\\?\"
+    static const std::string longPathQPrefix("\\\\?\\");
+    auto find_start_pos = starts_with(str, longPathQPrefix)
+                              ? longPathQPrefix.size()
+                              : size_t(0);
+
+    std::string::size_type mark_pos = str.find_first_of("?", find_start_pos);
     if (mark_pos == std::string::npos) {
         base = str;
         return true;
@@ -560,8 +566,8 @@ Strutil::splits(string_view str, string_view sep, int maxsplit)
     auto sr_result = splitsv(str, sep, maxsplit);
     std::vector<std::string> result;
     result.reserve(sr_result.size());
-    for (size_t i = 0, e = sr_result.size(); i != e; ++i)
-        result.push_back(sr_result[i]);
+    for (auto& s : sr_result)
+        result.push_back(s);
     return result;
 }
 
@@ -580,6 +586,8 @@ std::vector<string_view>
 Strutil::splitsv(string_view str, string_view sep, int maxsplit)
 {
     std::vector<string_view> result;
+    if (str.size() == 0)
+        return result;  // No source string --> no pieces
 
     // Implementation inspired by Pystring
     if (maxsplit < 0)
@@ -1279,7 +1287,7 @@ Strutil::strtof(const char* nptr, char** endptr) noexcept
 #ifdef __APPLE__
     // On OSX, strtod_l is for some reason drastically faster than strtof_l.
     return static_cast<float>(strtod_l(nptr, endptr, c_loc));
-#elif defined(__linux__) || defined(__FreeBSD__)                               \
+#elif defined(__linux__) || defined(__FreeBSD__) \
     || defined(__FreeBSD_kernel__) || defined(__GLIBC__)
     return strtof_l(nptr, endptr, c_loc);
 #elif defined(_WIN32)
@@ -1314,7 +1322,7 @@ double
 Strutil::strtod(const char* nptr, char** endptr) noexcept
 {
     // Can use strtod_l on platforms that support it
-#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)           \
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) \
     || defined(__FreeBSD_kernel__) || defined(__GLIBC__)
     // static initialization inside function is thread-safe by C++11 rules!
     return strtod_l(nptr, endptr, c_loc);

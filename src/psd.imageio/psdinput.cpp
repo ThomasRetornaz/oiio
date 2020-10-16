@@ -16,6 +16,7 @@
 #include <memory>
 #include <vector>
 
+#include <OpenImageIO/fmath.h>
 #include <OpenImageIO/tiffutils.h>
 
 #include "jpeg_memory_src.h"
@@ -304,7 +305,7 @@ private:
     {
         // RGB = CompRGB - (1 - alpha) * Background;
         double scale = std::numeric_limits<T>::is_integer
-                           ? 1.0 / std::numeric_limits<T>::max()
+                           ? 1.0 / double(std::numeric_limits<T>::max())
                            : 1.0;
 
         for (; size; --size, data += nchannels)
@@ -323,7 +324,7 @@ private:
     {
         // RGB = (CompRGB - (1 - alpha) * Background) / alpha
         double scale = std::numeric_limits<T>::is_integer
-                           ? 1.0 / std::numeric_limits<T>::max()
+                           ? 1.0 / double(std::numeric_limits<T>::max())
                            : 1.0;
 
         for (; size; --size, data += nchannels)
@@ -345,7 +346,7 @@ private:
     void associateAlpha(T* data, int size, int nchannels, int alpha_channel)
     {
         double scale = std::numeric_limits<T>::is_integer
-                           ? 1.0 / std::numeric_limits<T>::max()
+                           ? 1.0 / double(std::numeric_limits<T>::max())
                            : 1.0;
         for (; size; --size, data += nchannels)
             for (int c = 0; c < nchannels; c++)
@@ -461,10 +462,10 @@ private:
 // 1) Add ADD_LOADER(<ResourceID>) below
 // 2) Add a method in PSDInput:
 //    bool load_resource_<ResourceID> (uint32_t length);
-#define ADD_LOADER(id)                                                         \
-    {                                                                          \
-        id, std::bind(&PSDInput::load_resource_##id, std::placeholders::_1,    \
-                      std::placeholders::_2)                                   \
+#define ADD_LOADER(id)                                                      \
+    {                                                                       \
+        id, std::bind(&PSDInput::load_resource_##id, std::placeholders::_1, \
+                      std::placeholders::_2)                                \
     }
 const PSDInput::ResourceLoader PSDInput::resource_loaders[]
     = { ADD_LOADER(1005), ADD_LOADER(1006), ADD_LOADER(1010), ADD_LOADER(1033),
@@ -1612,7 +1613,7 @@ PSDInput::load_global_mask_info()
     uint32_t length;
 
     // This section should be at least 17 bytes, but some files lack
-    // global mask info and additional layer info, not convered in the spec
+    // global mask info and additional layer info, not covered in the spec
     if (remaining < 17) {
         m_file.seekg(m_layer_mask_info.end);
         return true;

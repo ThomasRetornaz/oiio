@@ -10,23 +10,24 @@
 #include <iostream>
 #include <map>
 #include <memory>
+
 #include <OpenImageIO/platform.h>
 
-#include <OpenEXR/IlmImf/ImfChannelList.h>
-#include <OpenEXR/IlmImf/ImfEnvmap.h>
-#include <OpenEXR/IlmImf/ImfOutputFile.h>
-#include <OpenEXR/IlmImf/ImfTiledOutputFile.h>
+#include <ImfChannelList.h>
+#include <ImfEnvmap.h>
+#include <ImfOutputFile.h>
+#include <ImfTiledOutputFile.h>
 
 #ifdef OPENEXR_VERSION_MAJOR
-#    define OPENEXR_CODED_VERSION                                              \
-        (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100           \
+#    define OPENEXR_CODED_VERSION                                    \
+        (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100 \
          + OPENEXR_VERSION_PATCH)
 #else
 #    define OPENEXR_CODED_VERSION 20000
 #endif
 
-#if OPENEXR_CODED_VERSION >= 20400                                             \
-    || __has_include(<OpenEXR/ImfFloatVectorAttribute.h>)
+#if OPENEXR_CODED_VERSION >= 20400 \
+    || __has_include(<ImfFloatVectorAttribute.h>)
 #    define OPENEXR_HAS_FLOATVECTOR 1
 #else
 #    define OPENEXR_HAS_FLOATVECTOR 0
@@ -37,32 +38,32 @@
 OIIO_PRAGMA_VISIBILITY_PUSH
 OIIO_PRAGMA_WARNING_PUSH
 OIIO_GCC_PRAGMA(GCC diagnostic ignored "-Wunused-parameter")
-#include <IlmBase/Iex/IexBaseExc.h>
-#include <OpenEXR/IlmImf/ImfBoxAttribute.h>
-#include <OpenEXR/IlmImf/ImfCRgbaFile.h>  // JUST to get symbols to figure out version!
-#include <OpenEXR/IlmImf/ImfChromaticitiesAttribute.h>
-#include <OpenEXR/IlmImf/ImfCompressionAttribute.h>
-#include <OpenEXR/IlmImf/ImfEnvmapAttribute.h>
-#include <OpenEXR/IlmImf/ImfFloatAttribute.h>
+#include <IexBaseExc.h>
+#include <ImfBoxAttribute.h>
+#include <ImfCRgbaFile.h>  // JUST to get symbols to figure out version!
+#include <ImfChromaticitiesAttribute.h>
+#include <ImfCompressionAttribute.h>
+#include <ImfEnvmapAttribute.h>
+#include <ImfFloatAttribute.h>
 #if OPENEXR_HAS_FLOATVECTOR
-#    include <OpenEXR/IlmImf/ImfFloatVectorAttribute.h>
+#    include <ImfFloatVectorAttribute.h>
 #endif
-#include <OpenEXR/IlmImf/ImfIntAttribute.h>
-#include <OpenEXR/IlmImf/ImfKeyCodeAttribute.h>
-#include <OpenEXR/IlmImf/ImfMatrixAttribute.h>
-#include <OpenEXR/IlmImf/ImfRationalAttribute.h>
-#include <OpenEXR/IlmImf/ImfStringAttribute.h>
-#include <OpenEXR/IlmImf/ImfTimeCodeAttribute.h>
-#include <OpenEXR/IlmImf/ImfVecAttribute.h>
+#include <ImfIntAttribute.h>
+#include <ImfKeyCodeAttribute.h>
+#include <ImfMatrixAttribute.h>
+#include <ImfRationalAttribute.h>
+#include <ImfStringAttribute.h>
+#include <ImfTimeCodeAttribute.h>
+#include <ImfVecAttribute.h>
 
-#include <OpenEXR/IlmImf/ImfDeepScanLineOutputPart.h>
-#include <OpenEXR/IlmImf/ImfDeepTiledOutputPart.h>
-#include <OpenEXR/IlmImf/ImfDoubleAttribute.h>
-#include <OpenEXR/IlmImf/ImfMultiPartOutputFile.h>
-#include <OpenEXR/IlmImf/ImfOutputPart.h>
-#include <OpenEXR/IlmImf/ImfPartType.h>
-#include <OpenEXR/IlmImf/ImfStringVectorAttribute.h>
-#include <OpenEXR/IlmImf/ImfTiledOutputPart.h>
+#include <ImfDeepScanLineOutputPart.h>
+#include <ImfDeepTiledOutputPart.h>
+#include <ImfDoubleAttribute.h>
+#include <ImfMultiPartOutputFile.h>
+#include <ImfOutputPart.h>
+#include <ImfPartType.h>
+#include <ImfStringVectorAttribute.h>
+#include <ImfTiledOutputPart.h>
 OIIO_PRAGMA_WARNING_POP
 OIIO_PRAGMA_VISIBILITY_POP
 
@@ -223,8 +224,8 @@ OIIO_EXPORT int openexr_imageio_version = OIIO_PLUGIN_VERSION;
 OIIO_EXPORT const char*
 openexr_imageio_library_version()
 {
-#ifdef OPENEXR_PACKAGE_STRING
-    return OPENEXR_PACKAGE_STRING;
+#ifdef OPENEXR_VERSION_STRING
+    return "OpenEXR " OPENEXR_VERSION_STRING;
 #else
     return "OpenEXR 1.x";
 #endif
@@ -817,7 +818,8 @@ struct ExrMeta {
 static ExrMeta exr_meta_translation[] = {
     // Translate OIIO standard metadata names to OpenEXR standard names
     ExrMeta("worldtocamera", "worldToCamera", TypeMatrix),
-    ExrMeta("worldtoscreen", "worldToNDC", TypeMatrix),
+    ExrMeta("worldtoNDC", "worldToNDC", TypeMatrix),
+    ExrMeta("worldtoscreen", "worldToScreen", TypeMatrix),
     ExrMeta("DateTime", "capDate", TypeString),
     ExrMeta("ImageDescription", "comments", TypeString),
     ExrMeta("description", "comments", TypeString),
@@ -889,9 +891,9 @@ OpenEXROutput::put_parameter(const std::string& name, TypeDesc type,
             else if (Strutil::iequals(str, "b44a"))
                 header.compression() = Imf::B44A_COMPRESSION;
 #endif
-#if defined(OPENEXR_VERSION_MAJOR)                                             \
-    && (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100            \
-        + OPENEXR_VERSION_PATCH)                                               \
+#if defined(OPENEXR_VERSION_MAJOR)                                  \
+    && (OPENEXR_VERSION_MAJOR * 10000 + OPENEXR_VERSION_MINOR * 100 \
+        + OPENEXR_VERSION_PATCH)                                    \
            >= 20200
             else if (Strutil::iequals(str, "dwaa"))
                 header.compression() = Imf::DWAA_COMPRESSION;

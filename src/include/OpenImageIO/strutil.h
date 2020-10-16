@@ -16,6 +16,7 @@
 
 #include <cstdio>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -24,12 +25,6 @@
 #include <OpenImageIO/oiioversion.h>
 #include <OpenImageIO/platform.h>
 #include <OpenImageIO/string_view.h>
-
-// For now, let a prior set of OIIO_USE_FMT=0 cause us to fall back to
-// tinyformat and/or disable its functionality. Use with caution!
-#ifndef OIIO_USE_FMT
-#    define OIIO_USE_FMT 1
-#endif
 
 #if OIIO_GNUC_VERSION >= 70000
 #    pragma GCC diagnostic push
@@ -41,12 +36,12 @@
 #ifndef FMT_EXCEPTIONS
 #    define FMT_EXCEPTIONS 0
 #endif
-#define FMT_USE_GRISU 1
-#if OIIO_USE_FMT
-#    include "fmt/ostream.h"
-#    include "fmt/format.h"
-#    include "fmt/printf.h"
+#ifndef FMT_USE_GRISU
+#    define FMT_USE_GRISU 1
 #endif
+#include "detail/fmt/ostream.h"
+#include "detail/fmt/format.h"
+#include "detail/fmt/printf.h"
 #if OIIO_GNUC_VERSION >= 70000
 #    pragma GCC diagnostic pop
 #endif
@@ -63,18 +58,6 @@
 // formatting is locale-independent. This was 0 in older versions when fmt
 // was locale dependent.
 #define OIIO_FMT_LOCALE_INDEPENDENT 1
-
-// Use fmt rather than tinyformat, even for printf-style formatting
-#ifndef OIIO_USE_FMT_FOR_SPRINTF
-#    define OIIO_USE_FMT_FOR_SPRINTF OIIO_USE_FMT
-#endif
-
-#if !OIIO_USE_FMT_FOR_SPRINTF
-#    ifndef TINYFORMAT_USE_VARIADIC_TEMPLATES
-#        define TINYFORMAT_USE_VARIADIC_TEMPLATES
-#    endif
-#    include <OpenImageIO/tinyformat.h>
-#endif
 
 #ifndef OPENIMAGEIO_PRINTF_ARGS
 #   ifndef __GNUC__
@@ -115,18 +98,14 @@ void OIIO_API sync_output (std::ostream &file, string_view str);
 ///
 ///    std::string s = Strutil::sprintf ("blah %d %g", (int)foo, (float)bar);
 ///
-/// Uses the tinyformat or fmt library underneath, so it's fully type-safe, and
+/// Uses the fmt library underneath, so it's fully type-safe, and
 /// works with any types that understand stream output via '<<'.
 /// The formatting of the string will always use the classic "C" locale
 /// conventions (in particular, '.' as decimal separator for float values).
 template<typename... Args>
 inline std::string sprintf (const char* fmt, const Args&... args)
 {
-#if OIIO_USE_FMT_FOR_SPRINTF
     return ::fmt::sprintf (fmt, args...);
-#else
-    return tinyformat::format (fmt, args...);
-#endif
 }
 
 
@@ -160,12 +139,7 @@ namespace fmt {
 template<typename... Args>
 inline std::string format (const char* fmt, const Args&... args)
 {
-#if OIIO_USE_FMT
     return ::fmt::format (fmt, args...);
-#else
-    // Disabled for some reason
-    return std::string(fmt);
-#endif
 }
 } // namespace fmt
 
@@ -262,6 +236,7 @@ std::string OIIO_API vsprintf (const char *fmt, va_list ap)
 /// Return a std::string formatted like Strutil::format, but passed
 /// already as a va_list.  This is not guaranteed type-safe and is not
 /// extensible like format(). Use with caution!
+OIIO_DEPRECATED("use `vsprintf` instead")
 std::string OIIO_API vformat (const char *fmt, va_list ap)
                                          OPENIMAGEIO_PRINTF_ARGS(1,0);
 
@@ -351,13 +326,27 @@ bool OIIO_API contains (string_view a, string_view b);
 /// comparison?
 bool OIIO_API icontains (string_view a, string_view b);
 
-/// Convert to upper case, faster than std::toupper because we use
+/// Convert to upper case in place, faster than std::toupper because we use
 /// a static locale that doesn't require a mutex lock.
 void OIIO_API to_lower (std::string &a);
 
-/// Convert to upper case, faster than std::toupper because we use
+/// Convert to upper case in place, faster than std::toupper because we use
 /// a static locale that doesn't require a mutex lock.
 void OIIO_API to_upper (std::string &a);
+
+/// Return an all-upper case version of `a` (locale-independent).
+inline std::string lower (string_view a) {
+    std::string result(a);
+    to_lower(result);
+    return result;
+}
+
+/// Return an all-upper case version of `a` (locale-independent).
+inline std::string upper (string_view a) {
+    std::string result(a);
+    to_upper(result);
+    return result;
+}
 
 
 
@@ -379,7 +368,8 @@ string_view OIIO_API rstrip (string_view str, string_view chars=string_view());
 
 /// Fills the "result" list with the words in the string, using sep as
 /// the delimiter string.  If maxsplit is > -1, at most maxsplit splits
-/// are done. If sep is "", any whitespace string is a separator.
+/// are done. If sep is "", any whitespace string is a separator.  If the
+/// source `str` is empty, there will be zero pieces.
 void OIIO_API split (string_view str, std::vector<string_view> &result,
                      string_view sep = string_view(), int maxsplit = -1);
 void OIIO_API split (string_view str, std::vector<std::string> &result,
@@ -390,7 +380,8 @@ void OIIO_API split (string_view str, std::vector<std::string> &result,
 /// at most `maxsplit` split fragments will be produced (for example,
 /// maxsplit=2 will split at only the first separator, yielding at most two
 /// fragments). The result is returned as a vector of std::string (for
-/// `splits()`) or a vector of string_view (for `splitsv()`).
+/// `splits()`) or a vector of string_view (for `splitsv()`). If the source
+/// `str` is empty, there will be zero pieces.
 OIIO_API std::vector<std::string>
 splits (string_view str, string_view sep = "", int maxsplit = -1);
 OIIO_API std::vector<string_view>
@@ -541,25 +532,13 @@ template<> inline float from_string<float> (string_view s) {
 /// can be overloaded if there is a better method for particular types.
 template<typename T>
 inline std::string to_string (const T& value) {
-#if OIIO_USE_FMT_FOR_SPRINTF
     return ::fmt::to_string(value);
-#else
-    return Strutil::sprintf("%s",value);
-#endif
 }
 
 // Some special pass-through cases
 inline std::string to_string (const std::string& value) { return value; }
 inline std::string to_string (string_view value) { return value; }
 inline std::string to_string (const char* value) { return value; }
-
-
-#if !OIIO_USE_FMT_FOR_SPRINTF && OIIO_USE_FMT
-// When not using fmt, nonetheless fmt::to_string is incredibly faster than
-// tinyformat for ints, so speciaize to use the fast one.
-inline std::string to_string (int value) { return ::fmt::to_string(value); }
-inline std::string to_string (size_t value) { return ::fmt::to_string(value); }
-#endif
 
 
 
@@ -597,8 +576,8 @@ template <> inline bool string_is<float> (string_view s) {
 ///
 /// This can work for type T = int, float, or any type for that has
 /// an explicit constructor from a std::string.
-template<class T>
-int extract_from_list_string (std::vector<T> &vals,
+template<class T, class Allocator>
+int extract_from_list_string (std::vector<T, Allocator> &vals,
                               string_view list,
                               string_view sep = ",")
 {
@@ -610,7 +589,7 @@ int extract_from_list_string (std::vector<T> &vals,
         if (nvals == 0)
             vals.push_back (v);
         else if (valuestrings[i].size()) {
-            if (vals.size() > i)  // don't replace non-existnt entries
+            if (vals.size() > i)  // don't replace non-existant entries
                 vals[i] = from_string<T> (valuestrings[i]);
         }
         /* Otherwise, empty space between commas, so leave default alone */

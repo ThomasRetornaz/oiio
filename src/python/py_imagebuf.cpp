@@ -265,10 +265,25 @@ declare_imagebuf(py::module& m)
             },
             "filename"_a, "dtype"_a = TypeUnknown, "fileformat"_a = "")
         .def(
+            "write",
+            [](ImageBuf& self, ImageOutput& out) {
+                py::gil_scoped_release gil;
+                return self.write(&out);
+            },
+            "out"_a)
+        .def(
+            "make_writable",
+            [](ImageBuf& self, bool keep_cache_type) {
+                py::gil_scoped_release gil;
+                return self.make_writable(keep_cache_type);
+            },
+            "keep_cache_type"_a = false)
+        // DEPRECATED(2.2): nonstandard spelling
+        .def(
             "make_writeable",
             [](ImageBuf& self, bool keep_cache_type) {
                 py::gil_scoped_release gil;
-                return self.make_writeable(keep_cache_type);
+                return self.make_writable(keep_cache_type);
             },
             "keep_cache_type"_a = false)
         .def("set_write_format", &ImageBuf_set_write_format)

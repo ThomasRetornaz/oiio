@@ -4,9 +4,15 @@
 
 
 /////////////////////////////////////////////////////////////////////////
-/// @file  platform.h
-///
-/// @brief Platform-related macros.
+// \file
+// platform.h is where we put all the platform-specific macros.
+// Things like:
+//
+//   * Detecting which compiler is being used.
+//   * Detecting which C++ standard is being used and what features are
+//     available.
+//   * Various helpers that need to be defined differently per compiler,
+//     language version, OS, etc.
 /////////////////////////////////////////////////////////////////////////
 
 // clang-format off
@@ -49,6 +55,7 @@
 #endif
 
 #include <OpenImageIO/oiioversion.h>
+#include <OpenImageIO/export.h>
 
 // Detect which C++ standard we're using, and handy macros.
 // See https://en.cppreference.com/w/cpp/compiler_support
@@ -157,6 +164,22 @@
 #  define OIIO_APPLE_CLANG_VERSION 0
 #endif
 
+// Define OIIO_INTEL_COMPILER_VERSION to hold an encoded Intel compiler
+// version (e.g. 1900), or 0 if not an Intel compiler.
+#if defined(__INTEL_COMPILER)
+#  define OIIO_INTEL_COMPILER_VERSION __INTEL_COMPILER
+#else
+#  define OIIO_INTEL_COMPILER_VERSION 0
+#endif
+
+// Intel's compiler on OSX may still define __clang__ and we have need to
+// know when using a true clang compiler.
+#if !defined(__INTEL_COMPILER) && defined(__clang__)
+#  define OIIO_NON_INTEL_CLANG  __clang__
+#else
+#  define OIIO_NON_INTEL_CLANG  0
+#endif
+
 // Tests for MSVS versions, always 0 if not MSVS at all.
 #if defined(_MSC_VER)
 #  if _MSC_VER < 1900
@@ -189,7 +212,7 @@
 
 // Generic pragma definition
 #if defined(_MSC_VER)
-    // Of couse MS does it in a quirky way
+    // Of course MS does it in a quirky way
     #define OIIO_PRAGMA(UnQuotedPragma) __pragma(UnQuotedPragma)
 #else
     // All other compilers seem to support C99 _Pragma
@@ -204,8 +227,10 @@
 #    define OIIO_GCC_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
 #    if defined(__clang__)
 #        define OIIO_CLANG_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
+#        define OIIO_GCC_ONLY_PRAGMA(UnQuotedPragma)
 #    else
 #        define OIIO_CLANG_PRAGMA(UnQuotedPragma)
+#        define OIIO_GCC_ONLY_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
 #    endif
 #    define OIIO_MSVS_PRAGMA(UnQuotedPragma)
 #elif defined(_MSC_VER)
@@ -214,6 +239,7 @@
 #    define OIIO_PRAGMA_VISIBILITY_PUSH /* N/A on MSVS */
 #    define OIIO_PRAGMA_VISIBILITY_POP  /* N/A on MSVS */
 #    define OIIO_GCC_PRAGMA(UnQuotedPragma)
+#    define OIIO_GCC_ONLY_PRAGMA(UnQuotedPragma)
 #    define OIIO_CLANG_PRAGMA(UnQuotedPragma)
 #    define OIIO_MSVS_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
 #else
@@ -222,6 +248,7 @@
 #    define OIIO_PRAGMA_VISIBILITY_PUSH
 #    define OIIO_PRAGMA_VISIBILITY_POP
 #    define OIIO_GCC_PRAGMA(UnQuotedPragma)
+#    define OIIO_GCC_ONLY_PRAGMA(UnQuotedPragma)
 #    define OIIO_CLANG_PRAGMA(UnQuotedPragma)
 #    define OIIO_MSVS_PRAGMA(UnQuotedPragma)
 #endif
@@ -359,8 +386,8 @@
 
 
 // OIIO_FALLTHROUGH at the end of a `case` label's statements documents that
-// he switch statement case is intentionally falling through to the code for
-// the next case.
+// the switch statement case is intentionally falling through to the code
+// for the next case.
 #if OIIO_CPLUSPLUS_VERSION >= 17 || __has_cpp_attribute(fallthrough)
 #    define OIIO_FALLTHROUGH [[fallthrough]]
 #else
@@ -505,8 +532,8 @@ inline bool cpu_has_avx512bw() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<30)) 
 inline bool cpu_has_avx512vl() {int i[4]; cpuid(i,7,0); return (i[1] & (0x80000000 /*1<<31*/)) != 0; }
 
 // portable aligned malloc
-void* aligned_malloc(std::size_t size, std::size_t align);
-void  aligned_free(void* ptr);
+OIIO_API void* aligned_malloc(std::size_t size, std::size_t align);
+OIIO_API void  aligned_free(void* ptr);
 
 // basic wrappers to new/delete over-aligned types since this isn't guaranteed to be supported until C++17
 template <typename T, class... Args>

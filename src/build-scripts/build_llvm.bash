@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# Utility script to download and build LLVM & clang
+
+# Exit the whole script if any command fails.
+set -ex
 
 echo "Building LLVM"
 uname

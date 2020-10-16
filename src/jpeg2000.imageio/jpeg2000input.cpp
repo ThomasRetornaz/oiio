@@ -8,7 +8,6 @@
 #include <openjpeg.h>
 
 #include <OpenImageIO/filesystem.h>
-#include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imageio.h>
 
@@ -36,7 +35,7 @@ openjpeg_dummy_callback(const char* /*msg*/, void* /*data*/)
 
 
 
-// TODO(sergey): This actually a stright duplication from the png reader,
+// TODO(sergey): This actually a straight duplication from the png reader,
 // consider de-duplicating the code somehow?
 template<class T>
 void

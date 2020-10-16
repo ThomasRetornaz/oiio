@@ -3,7 +3,7 @@
 // https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
 
 
-#include <IlmBase/Half/half.h>
+#include <half.h>
 
 #include <cmath>
 #include <iostream>
@@ -418,7 +418,7 @@ ImageBufAlgo::deep_holdout(ImageBuf& dst, const ImageBuf& src,
         }
         // Now split any samples that straddle the z.
         if (dstdd.split(dstpixel, zthresh)) {
-            // If a split did occur, do anohter discard pass.
+            // If a split did occur, do another discard pass.
             for (int s = 0, n = dstdd.samples(dstpixel); s < n; ++s) {
                 if (dstdd.deep_value(dstpixel, Zbackchan, s) > zthresh) {
                     dstdd.set_samples(dstpixel, s);

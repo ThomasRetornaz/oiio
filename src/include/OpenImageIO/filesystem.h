@@ -214,6 +214,11 @@ OIIO_API void open (OIIO::ofstream &stream, string_view path,
 /// returning true on success, false on failure.
 OIIO_API bool read_text_file (string_view filename, std::string &str);
 
+/// Write the entire contents of the string `str` to the file, overwriting
+/// any prior contents of the file (if it existed), returning true on
+/// success, false on failure.
+OIIO_API bool write_text_file (string_view filename, string_view str);
+
 /// Read a maximum of n bytes from the named file, starting at position pos
 /// (which defaults to the start of the file), storing results in
 /// buffer[0..n-1]. Return the number of bytes read, which will be n for
@@ -249,7 +254,7 @@ OIIO_API void convert_native_arguments (int argc, const char *argv[]);
 ///                           NOT have been selected by 'x'.
 ///     Note that START may be > FINISH, or STEP may be negative.
 ///  * Multiple values or ranges, separated by a comma (e.g., "3,4,10-20x2")
-/// Retrn true upon success, false if the description was too malformed
+/// Return true upon success, false if the description was too malformed
 /// to generate a sequence.
 OIIO_API bool enumerate_sequence (string_view desc,
                                   std::vector<int> &numbers);
@@ -351,7 +356,7 @@ public:
     bool seek (int64_t offset, int origin) {
         return seek ((origin == SEEK_SET ? offset : 0) +
                      (origin == SEEK_CUR ? offset+tell() : 0) +
-                     (origin == SEEK_END ? size() : 0));
+                     (origin == SEEK_END ? offset+int64_t(size()) : 0));
     }
 
 #if OIIO_VERSION >= 20101

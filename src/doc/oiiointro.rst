@@ -227,7 +227,6 @@ OpenImageIO incorporates, distributes, or contains derived works of:
 * Squish © 2006 Simon Brown, MIT license. http://sjbrown.co.uk/?code=squish
 * PugiXML © 2006-2009 by Arseny Kapoulkine (based on work © 2003 Kristen Wegner), MIT license. http://pugixml.org/
 * DPX reader/writer © 2009 Patrick A. Palmer, BSD 3-clause license. https://github.com/patrickpalmer/dpx}
-* tinyformat.h © 2011 Chris Foster, Boost license. http://github.com/c42f/tinyformat
 * lookup3 code by Bob Jenkins, Public Domain. http://burtleburtle.net/bob/c/lookup3.c
 * xxhash © 2014 Yann Collet, BSD 2-clause license. https://github.com/Cyan4973/xxHash
 * farmhash © 2014 Google, Inc., MIT license. https://github.com/google/farmhash
@@ -248,7 +247,7 @@ system installs, referencing as git submodules, or downloading as part of
 the build), including link-time dependencies
 against dynamic libraries:
 
-* libtiff <http://www.remotesensing.org/libtiff> © 1988-1997 Sam Leffler and 1991-1997 Silicon Graphics, Inc.  http://www.remotesensing.org/libtiff
+* libtiff © 1988-1997 Sam Leffler and 1991-1997 Silicon Graphics, Inc.  http://www.remotesensing.org/libtiff
 * IJG libjpeg © 1991-1998, Thomas G. Lane.  http://www.ijg.org
 * OpenEXR, Ilmbase, and Half © 2006, Industrial Light & Magic. http://www.openexr.com
 * zlib © 1995-2005 Jean-loup Gailly and Mark Adler. http://www.zlib.net
@@ -264,7 +263,7 @@ against dynamic libraries:
 * FreeType © 1996-2002, 2006 by David Turner, Robert Wilhelm, and Werner Lemberg. Distributed under the FreeType license (BSD compatible).
 * JPEG-Turbo © 2009--2015 D. R. Commander. Distributed under the BSD license.
 * pybind11 © 2016 Wenzel Jakob. Distributed under the BSD license. https://github.com/pybind/pybind11
-* OpenVDB © 2012-2018 DreamWorks Animation LLC, Mozilla Public License 2.0.
+* OpenVDB © 2012-2018 DreamWorks Animation LLC, Mozilla Public License 2.0. https://www.openvdb.org/
 * Thread Building Blocks © Intel. Apache 2.0 license. https://www.threadingbuildingblocks.org/
 * libheif \copyright 2017-2018 Struktur AG (LGPL). https://github.com/strukturag/libheif
 

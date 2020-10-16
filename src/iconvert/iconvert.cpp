@@ -333,7 +333,7 @@ convert_file(const std::string& in_filename, const std::string& out_filename)
     if (!out) {
         std::cerr
             << "iconvert ERROR: Could not find an ImageIO plugin to write \""
-            << out_filename << "\" :" << geterror() << "\n";
+            << out_filename << "\" : " << geterror() << "\n";
         return false;
     }
 
@@ -499,7 +499,7 @@ main(int argc, char* argv[])
 
     // Force all files to close, ugh, it's the only way I can find to solve
     // an occasional problem with static destructor order fiasco with
-    // field3dwhen building with EMBEDPLUGINS=0 on MacOS.
+    // field3d when building with EMBEDPLUGINS=0 on MacOS.
     ImageCache::create()->close_all();
 
     return ok ? EXIT_SUCCESS : EXIT_FAILURE;

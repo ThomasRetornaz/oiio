@@ -1,10 +1,66 @@
 Installation instructions for OpenImageIO
 =========================================
 
-For the most up-to-date build instructions (and in any case somewhat
-more detailed than here), please see our wiki:
+# Table of Contents
+1. [OpenImageIO's Dependencies](#dependencies)
+2. [Installing binaries from package managers](#installingfrompackagemanagers)
+3. [Building OIIO from source](#buildingfromsource)
 
-https://sites.google.com/site/openimageio/checking-out-and-building-openimageio
+
+Dependencies
+------------
+
+NEW or CHANGED MINIMUM dependencies since the last major release are **bold**.
+
+### Required dependencies -- OIIO will not build at all without these
+
+ * C++11 (also builds with C++14 and C++17)
+ * Compilers: gcc 4.8.2 - 10.2, clang 3.3 - 10.0, MSVS 2015 - 2019,
+   icc version 13 or higher
+ * CMake >= 3.12 (tested through 3.18)
+ * OpenEXR >= 2.0 (recommended: 2.2 or higher; tested through 2.5)
+ * libTIFF >= 3.9 (recommended: 4.0+; tested through 4.1.0)
+
+### Optional dependencies -- features may be disabled if not found
+ * If you are building the `iv` viewer (which will be disabled if any of
+   these are not found):
+     * Qt >= 5.6 (tested through 5.15)
+     * OpenGL
+ * If you are building the Python bindings or running the testsuite:
+     * Python >= 2.7 (tested against 2.7, 3.6, 3.7, 3.8)
+     * pybind11 >= 2.4.2 (Tested through 2.5.)
+     * NumPy
+ * If you want support for camera "RAW" formats:
+     * LibRaw >= 0.15 (tested 0.15 - 0.20; LibRaw >= 0.18 is necessary for
+       ACES support and much better recognition of camera metadata)
+ * If you want support for a wide variety of video formats:
+     * ffmpeg >= 2.6 (tested through 4.3)
+ * If you want support for jpeg 2000 images:
+     * **OpenJpeg >= 2.0** (tested through 2.3)
+ * If you want support for Field3D files:
+     * Field3D
+ * If you want support for OpenVDB files:
+     * OpenVDB >= 5.0 (tested through 7.0) and Intel TBB >= 2018 (tested
+       through 2020_U1)
+ * If you want support for converting to and from OpenCV data structures,
+   or for capturing images from a camera:
+     * OpenCV 2.x, 3.x, or 4.x (tested through 4.3)
+ * If you want support for GIF images:
+     * giflib >= 4.1 (tested through 5.2; 5.0+ is strongly recommended for
+       stability and thread safety)
+ * If you want support for HEIF/HEIC images:
+     * libheif >= 1.3 (tested through 1.9; older versions may also work, we
+       haven't tested)
+ * If you want support for DDS files:
+     * libsquish >= 1.13 (tested through 1.15)
+     * But... if not found on the system, an embedded version will be used.
+ * If you want support for DICOM medical image files:
+     * DCMTK >= 3.6.1 (tested through 3.6.5)
+ * If you want support for OpenColorIO color transformations:
+     * OpenColorIO >= 1.1 (also tested against the current master that will
+       become OCIO 2.0).
+
+
 
 Supported platforms at present include Linux (32 and 64 bit),
 Mac OS X, and Windows.
@@ -18,57 +74,34 @@ to the 'lib' directory where OpenImageIO is installed, or else it will
 not be able to find the plugins.
 
 
-Dependencies
-------------
+Installing from package managers
+================================
 
-NEW or CHANGED MINIMUM dependencies since the last major release are **bold**.
+If all you want to do is install the OIIO libraries, headers, and command
+line tools as quickly as possible (don't need OIIO source or any custom
+build options), maybe one of these packages managers will do it for you:
 
-### Required dependencies -- OIIO will not build at all without these
+* vcpkg (https://github.com/Microsoft/vcpkg)
+    * https://github.com/Microsoft/vcpkg/tree/master/ports/openimageio
+    * `.\vcpkg install openimageio [tools]`
+    * For a full list of supported build features: `.\vcpkg search openimageio`
+* homebrew (https://github.com/Homebrew/brew)
+    * https://formulae.brew.sh/formula/openimageio
+    * `brew install openimageio`
+* macports (https://github.com/macports/macports-ports)
+    * https://www.macports.org/ports.php?by=name&substr=openimageio
+    * `port install openimageio`
+* fink (https://github.com/fink/fink)
+    * http://pdb.finkproject.org/pdb/package.php/libopenimageio2.1-shlibs
+    * `fink install openimageio`
+* conan (https://github.com/conan-io/conan)
 
- * C++11 (also builds with C++14 and C++17)
- * Compilers: gcc 4.8.2 - 9.1, clang 3.3 - 9.0, MSVS 2015 - 2019,
-   icc version 13 or higher
- * Boost >= 1.53 (tested up through 1.71)
- * CMake >= 3.12 (tested up through 3.16)
- * OpenEXR >= 2.0 (recommended: 2.2 or higher; tested through 2.4)
- * libTIFF >= 3.9 (recommended: 4.0+)
+If these work for you and it's all you need, bingo! You are done.
 
-### Optional dependencies -- features may be disabled if not found
- * If you are building the `iv` viewer (which will be disabled if any of
-   these are not found):
-     * Qt >= 5.6 (tested through 5.14)
-     * OpenGL
- * If you are building the Python bindings or running the testsuite:
-     * Python >= 2.7 (tested against 2.7, 3.6, 3.7)
-     * NumPy
-     * pybind11 >= 2.4.2 (Tested through 2.4.3. If no adequate pybind11 is
-       found already on the system, OIIO will auto-download it.
- * If you want support for camera "RAW" formats:
-     * libRaw >= 0.15 (tested 0.15 - 0.19; libRaw >= 0.18 is necessary for
-       ACES support and much better recognition of camera metadata)
- * If you want support for a wide variety of video formats:
-     * ffmpeg >= 2.6 (tested through 4.2)
- * If you want support for jpeg 2000 images:
-     * OpenJpeg >= 1.5 (tested through 2.3; version 2.0+ is strongly recommended)
- * If you want support for Field3D files:
-     * Field3D
- * If you want support for OpenVDB files:
-     * OpenVDB >= 5.0 and Intel TBB >= 2018
- * If you want support for converting to and from OpenCV data structures,
-   or for capturing images from a camera:
-     * OpenCV 2.x, 3.x, or 4.x
- * If you want support for GIF images:
-     * giflib >= 4.1 (5.0+ is strongly recommended for stability and
-       thread safety)
- * If you want support for HEIF/HEIC images:
-     * libheif >= 1.3 (tested through 1.6; older versions may also work, we
-       haven't tested)
-* If you want support for DDS files:
-     * libsquish >= 1.13
-     * But... if not found on the system, an embedded version will be used.
-* If you want support for DICOM medical image files:
-     * DCMTK >= 3.6.1
 
+
+Building from source
+====================
 
 
 Dependency control and disabling components
@@ -117,8 +150,14 @@ Building OpenImageIO on Linux or OS X
 -------------------------------------
 
 The following dependencies must be installed to build the core of
-OpenImageIO: Boost, libjpeg, libtiff, libpng and OpenEXR.  These can be
-installed using the standard package managers on your system.
+OpenImageIO:
+* Boost
+* libjpeg
+* libtiff
+* libpng
+* OpenEXR.
+
+These can be installed using the standard package managers on your system.
 Optionally, to build the image viewing tools, you will need Qt and OpenGL.
 
 On OS X, these dependencies can be installed using Fink, MacPorts or
@@ -140,9 +179,9 @@ directories must notify the CMake system using environment variables.
 For example, set QTDIR to point at the root of the Qt library location
 so that CMake can find it (see CMake configuration output).
 
-On Linux and OS X, you can build from source from the top-level
+**On Linux and OS X, you can build from source from the top-level
 directory by just typing 'make'.  (Yes, we have a 'make' wrapper around
-our CMake build, it simplifies things.)
+our CMake build, it simplifies things.)**
 
 During the make, various temporary files (object files, etc.) will
 be put in build/PLATFORM, where 'PLATFORM' will be the name of the
@@ -176,7 +215,7 @@ Additionally, a few helpful modifiers alter some build-time options:
 | make USE_PYTHON=0 ...     |  Don't build the Python binding                |
 | make BUILD_SHARED_LIBS=0  |  Build static library instead of shared        |
 | make LINKSTATIC=1 ...     |  Link with static external libraries when possible |
-| make SOVERSION=nn ...     |  Include the specifed major version number in the shared object metadata |
+| make SOVERSION=nn ...     |  Include the specified major version number in the shared object metadata |
 | make NAMESPACE=name       |   Wrap everything in another namespace         |
 
 The command 'make help' will list all possible options.
@@ -188,7 +227,7 @@ CMake directly:
     cd build
     cmake ..
 
-If the compile stops because of warnings, try again with 
+If the compile stops because of warnings, try again with
 
     make nuke
     make STOP_ON_WARNING=0
@@ -204,93 +243,18 @@ or, if you are using CMake directly,
 Building on Windows
 -------------------
 
-See the latest Windows build docs on our web site:
-https://sites.google.com/site/openimageio/building-oiio-on-windows
+**Method 1 - from source**
 
-1. Check out the trunk or a branch of your choice.  The remainder of
-   these instructions assume that you checked out the trunk to the
-   D:\OIIO\trunk directory.
+I really need someone to write correct, modern docs about how to build
+from source on Windows.
 
-2. Download the package with precompiled external libraries from
-http://www.openimageio.org/external.zip
+**Method 2 - Using vcpkg**
 
-   Next, unpack it. The directory with downloaded code from the repository
-   and the directory with unpacked libraries should be siblings. For example,
+1. Visit Microsoft's vcpkg GitHub page: https://github.com/Microsoft/vcpkg. Also note that the openimageio package is located here: https://github.com/Microsoft/vcpkg/tree/master/ports/openimageio
 
-   ```
-   D:
-       \OIIO
-           \trunk          // this is my tree
-               \src        // directory with src files for OIIO
-               \build      // directory that is created by cmake
-           \external       // this is extracted external package
-               \dist
-                   \windows
-                       \glew-1.5.1
-                       \ilmbase-1.0.1
-                       \jpeg-6b
-                       \libpng-1.2.3
-                       \openexr-1.6.1
-                       \tbb-21_20080605oss
-                       \zlib-1.2.3
-                       \tiff-3.8.2
-   ```
+2. Follow vcpkg installation instructions and complete the install. Please note vcpkg has its own list of prerequisites listed on their page.
 
-3. Download precompiled Qt4 binaries for Windows from here:
-   http://qt.windows.binaries.googlepages.com/index.html
-
-   Unpack it (it doesn't matter where). After unpacking, add the path to
-   the Qt bin directory to the PATH variable. For example, if you unpacked
-   this package to the D:\qt-win directory, you should add D:\qt-win\bin to
-   your PATH. It's important to add the Qt bin directory to PATH because
-   the FindQt4 module uses it to search for qmake applications.
-
-4. Also, just to be safe, add QTDIR to the environment variables. It
-   should point to directory where you unpacked Qt.
-
-5. Download precompiled BOOST 1.53 or newer libraries from
-   http://www.boostpro.com/download
-
-   Install it on your system. Choose two versions: Multithread Debug, DLL
-   and Multithread, DLL for Your Visual Studio version.
-
-6. Download precompiled BOOST 1.53 or newer libraries from here (unfficial
-   mirror) or from here (unofficial mirror, registration required). Install
-   it on Your system. Choose two versions: Multithread Debug, DLL and
-   Multithread, DLL for Your Visual Studio version.
-
-7. Install cmake. You can download precompiled binaries from here:
-   http://www.cmake.org/cmake/resources/software.html
-   After installing, run cmake-gui. Set the field that specifies the source
-   code location (for example, to D:\OIIO\trunk\src). Then set the field
-   that specifies where to build binaries to the directory you want to
-   build project for OIIO (for example, D:\OIIO\trunk\build).
-
-8. Set the THIRD_PARTY_TOOLS_HOME environment variable to the directory
-   where are stored unpacked external libraries (for example,
-   D:\OIIO\external\dist\windows). You can add variables by clicking Add
-   entry button.
-
-9. Hit the Configure button. Cmake should automatically find externals
-   libraries and prepare the environment for creating the OIIO project. If
-   the configuration process ends without errors go to next step. If not,
-   read the instructions from the end of this tutorial.
-
-10. Hit the Generate button. Cmake will build Visual Studio a solution in
-the build directory.
-
-11. That's all. You can open the OpenImageIO solution and start developing
-OIIO! Potential problems:
-
-
-It may happen that cmake won't find zlib, png, tiff or jpeg
-libraries. If so you have to set CMAKE_PREFIX_PATH to point to the
-directory where the missing libraries are stored. For example, if cmake
-can't find ZLIB, add to CMAKE_PREFIX_PATH the
-D:\OIIO\external\dist\windows\zlib-1.2.3 directory. If it can't find
-ZLIB and PNG, add
-D:\OIIO\external\dist\windows\zlib-1.2.3;D:\OIIO\external\dist\windows\libpng-1.2.3.
-
+3. Execute the PowerShell command from where vcpkg is located in directory. ``.\vcpkg install openimageio``
 
 Test Images
 -----------

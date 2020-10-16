@@ -11,10 +11,11 @@
 #pragma once
 
 #include <OpenImageIO/imageio.h>
+#include <OpenImageIO/simd.h>
 #include <OpenImageIO/ustring.h>
 #include <OpenImageIO/varyingref.h>
 
-#include <IlmBase/Imath/ImathVec.h> /* because we need V3f */
+#include <ImathVec.h> /* because we need V3f */
 
 
 // Define symbols that let client applications determine if newly added
@@ -363,7 +364,7 @@ public:
     TextureOptions();
 
     /// Convert a TextureOpt for one point into a TextureOptions with
-    /// uninform values.
+    /// uniform values.
     TextureOptions(const TextureOpt& opt);
 
     // Options that must be the same for all points we're texturing at once
@@ -1425,8 +1426,15 @@ public:
     ///         The projection matrix, which is a 4x4 matrix (an
     ///         `Imath::M44f`, described as `TypeMatrix44`) giving the
     ///         matrix that projected points from world space into a 2D
-    ///         screen coordinate system where *x* and *y* range from $-1$
-    ///         to $+1$.  Generally, only rendered images will have this.
+    ///         screen coordinate system where *x* and *y* range from -1 to
+    ///         +1.  Generally, only rendered images will have this.
+    ///
+    ///   - `worldtoNDC` (matrix) :
+    ///         The projection matrix, which is a 4x4 matrix (an
+    ///         `Imath::M44f`, described as `TypeMatrix44`) giving the
+    ///         matrix that projected points from world space into a 2D
+    ///         screen coordinate system where *x* and *y* range from 0 to
+    ///         +1.  Generally, only rendered images will have this.
     ///
     ///   - `averagecolor` (float[nchannels]) :
     ///         If available in the metadata (generally only for files that
@@ -1480,7 +1488,7 @@ public:
     ///
     ///   - `stat:mipsused` (int) :
     ///         Stores 1 if any MIP levels beyond the highest resolution
-    ///         were accesed, otherwise 0.
+    ///         were accessed, otherwise 0.
     ///
     ///   - `stat:is_duplicate` (int) :
     ///         Stores 1 if this file was a duplicate of another image,
@@ -1580,14 +1588,15 @@ public:
                                         int subimage=0) = 0;
 
     /// For a texture specified by name, retrieve the rectangle of raw
-    /// unfiltered texels from the designated subimage and MIP level,
-    /// storing the pixel values beginning at the address specified by
-    /// `result` and with the given strides.  The pixel values will be
-    /// converted to the data type specified by `format`. The rectangular
-    /// region to be retrieved includes `begin` but does not include `end`
-    /// (much like STL begin/end usage). Requested pixels that are not part
-    /// of the valid pixel data region of the image file will be filled with
-    /// zero values.
+    /// unfiltered texels from the subimage specified in `options` and at
+    /// the designated `miplevel`, storing the pixel values beginning at the
+    /// address specified by `result`.  The pixel values will be converted
+    /// to the data type specified by `format`. The rectangular region to be
+    /// retrieved includes `begin` but does not include `end` (much like STL
+    /// begin/end usage). Requested pixels that are not part of the valid
+    /// pixel data region of the image file will be filled with zero values.
+    /// Channels requested but not present in the file will get the
+    /// `options.fill` value.
     ///
     /// @param  filename
     ///             The name of the image.
@@ -1603,8 +1612,8 @@ public:
     ///             include the begin value but not the end value (much like
     ///             STL begin/end usage).
     /// @param  chbegin/chend
-    ///             Channel range to retrieve. For all channels, use
-    ///             `chbegin = 0`, `chend = spec.nchannels`.
+    ///             Channel range to retrieve. To retrieve all channels, use
+    ///             `chbegin = 0`, `chend = nchannels`.
     /// @param  format
     ///             TypeDesc describing the data type of the values you want
     ///             to retrieve into `result`. The pixel values will be
@@ -1684,7 +1693,7 @@ public:
     virtual std::string getstats (int level=1, bool icstats=true) const = 0;
 
     /// Reset most statistics to be as they were with a fresh TextureSystem.
-    /// Caveat emptor: this does not flush the cache itelf, so the resulting
+    /// Caveat emptor: this does not flush the cache itself, so the resulting
     /// statistics from the next set of texture requests will not match the
     /// number of tile reads, etc., that would have resulted from a new
     /// TextureSystem.

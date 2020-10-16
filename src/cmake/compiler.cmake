@@ -116,7 +116,7 @@ if (${CXX_VISIBILITY_PRESET} STREQUAL "hidden" AND
     (CMAKE_SYSTEM_NAME MATCHES "Linux|kFreeBSD" OR CMAKE_SYSTEM_NAME STREQUAL "GNU"))
     # Linux/FreeBSD/Hurd: also hide all the symbols of dependent libraries
     # to prevent clashes if an app using this project is linked against
-    # other verions of our dependencies.
+    # other versions of our dependencies.
     set (VISIBILITY_MAP_COMMAND "-Wl,--version-script=${VISIBILITY_MAP_FILE}")
 endif ()
 
@@ -143,11 +143,9 @@ if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_APPLECLANG)
         add_compile_options ("-Wno-unused-local-typedefs")
     endif ()
     if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 3.9)
-        # Don't warn about using unknown preprocessor symbols in #if'set
+        # Don't warn about using unknown preprocessor symbols in `#if`
         add_compile_options ("-Wno-expansion-to-defined")
     endif ()
-    add_compile_options("-Wno-deprecated-register")
-    add_compile_options("-Wno-implicit-float-conversion")
 endif ()
 
 if (CMAKE_COMPILER_IS_GNUCC AND NOT (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_APPLECLANG))
@@ -191,9 +189,9 @@ endif ()
 # Use ccache if found
 #
 # This can really speed up compilation by caching object files that have
-# been compiled previously with idential arguments and inputs. Putting this
+# been compiled previously with identical arguments and inputs. Putting this
 # logic here makes it work even if the user is unaware of ccache. If it's
-# not found on the system, it will simply be silnetly not used.
+# not found on the system, it will simply be silently not used.
 option (USE_CCACHE "Use ccache if found" ON)
 find_program (CCACHE_FOUND ccache)
 if (CCACHE_FOUND AND USE_CCACHE)
@@ -238,8 +236,8 @@ endif ()
 ###########################################################################
 # SIMD and machine architecture options.
 #
-# The USE_SIMD optinon may be set to a comma-separated list of machine /
-# instruction set optinos, such as "avx3,f16c". The list will be parsed and
+# The USE_SIMD option may be set to a comma-separated list of machine /
+# instruction set options, such as "avx3,f16c". The list will be parsed and
 # the proper compiler directives added to generate code for those ISA
 # capabilities.
 #
@@ -306,7 +304,7 @@ endif ()
 # Check if we need libatomic on this platform.  We shouldn't on mainstream
 # x86/x86_64, but might on some other platforms.
 #
-if (NOT MSVC)
+if (NOT MSVC AND NOT APPLE)
     cmake_push_check_state ()
     check_cxx_source_runs(
        "#include <atomic>
@@ -437,7 +435,7 @@ endif ()
 set (CLANG_FORMAT_EXE_HINT "" CACHE PATH "clang-format executable's directory (will search if not specified")
 set (CLANG_FORMAT_INCLUDES "src/*.h" "src/*.cpp"
     CACHE STRING "Glob patterns to include for clang-format")
-set (CLANG_FORMAT_EXCLUDES "*pugixml*" "*SHA1*" "*/farmhash.cpp" "*/tinyformat.h"
+set (CLANG_FORMAT_EXCLUDES "*pugixml*" "*SHA1*" "*/farmhash.cpp"
                            "src/dpx.imageio/libdpx/*"
                            "src/cineon.imageio/libcineon/*"
                            "src/dds.imageio/squish/*"
@@ -452,7 +450,7 @@ find_program (CLANG_FORMAT_EXE
               NO_DEFAULT_PATH
               DOC "Path to clang-format executable")
 find_program (CLANG_FORMAT_EXE NAMES clang-format bin/clang-format)
-if (CLANG_FORMAT_EXE)
+if (0)
     message (STATUS "clang-format found: ${CLANG_FORMAT_EXE}")
     # Start with the list of files to include when formatting...
     file (GLOB_RECURSE FILES_TO_FORMAT ${CLANG_FORMAT_INCLUDES})
