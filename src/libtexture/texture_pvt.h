@@ -568,7 +568,7 @@ private:
                               ///<   the file has more channels
     /// Saved error string, per-thread
     ///
-    mutable thread_specific_ptr<std::string> m_errormessage;
+    inline static thread_local TGetter<std::string> m_errormessage = {};
     Filter1D* hq_filter;  ///< Better filter for magnification
     int m_statslevel;
     friend class TextureSystem;

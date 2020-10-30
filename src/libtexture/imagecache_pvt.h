@@ -12,8 +12,6 @@
 
 #include <tsl/robin_map.h>
 
-#include <boost/thread/tss.hpp>
-
 #include <half.h>
 
 #include <OpenImageIO/export.h>
@@ -42,7 +40,6 @@ namespace pvt {
 #define FILE_CACHE_SHARDS 64
 #define TILE_CACHE_SHARDS 128
 
-using boost::thread_specific_ptr;
 
 class ImageCacheImpl;
 class ImageCachePerThreadInfo;
@@ -52,13 +49,58 @@ texture_format_name(TexFormat f);
 const char*
 texture_type_name(TexFormat f);
 
-#ifdef BOOST_CONTAINER_FLAT_MAP_HPP
-typedef boost::container::flat_map<uint64_t, ImageCacheFile*> UdimLookupMap;
-#else
 typedef unordered_map<uint64_t, ImageCacheFile*> UdimLookupMap;
-#endif
 
+//thread_local std::map<void*, std::shared_ptr<void>> thread_specific_ptr_data;
+//
+//template<typename T> class thread_specific_ptr {
+//public:
+//    T* get() const
+//    {
+//        auto it = thread_specific_ptr_data.find(this);
+//        if (it != thread_specific_ptr_data.end())
+//            return static_cast<T*>(it->second.get());
+//        thread_specific_ptr_data[this] = T*;
+//        return thread_specific_ptr_data[this];
+//    }
+//
+//    T* operator->() const { 
+//      return this->get();
+//    }
+//    T& operator*() const 
+//    { 
+//      return *this->get();
+//    }
+//
+//};
+template<typename T>
+class TGetter {
+public:
+    TGetter() {}
 
+    T* operator->()
+    {
+        if (!_impl)
+            _impl = std::make_unique<T>();
+
+        return _impl.get();
+    }
+    T* get()
+    {
+        if (!_impl)
+            _impl = std::make_unique<T>();
+
+        return _impl.get();
+    }
+    void reset(T* new_value = 0) 
+    { 
+      _impl.reset(new_value);
+    }
+    T* release() { return _impl.release(); }
+
+private:
+    std::unique_ptr<T> _impl;
+};
 
 /// Structure to hold IC and TS statistics.  We combine into a single
 /// structure to minimize the number of costly thread_specific_ptr
@@ -1098,7 +1140,8 @@ private:
     /// Clear the fingerprint list, thread-safe.
     void clear_fingerprints();
 
-    thread_specific_ptr<ImageCachePerThreadInfo> m_perthread_info;
+    static inline thread_local TGetter<ImageCachePerThreadInfo> m_perthread_info
+        = {};
     std::vector<ImageCachePerThreadInfo*> m_all_perthread_info;
     static spin_mutex m_perthread_info_mutex;  ///< Thread safety for perthread
     int m_max_open_files;
@@ -1139,7 +1182,7 @@ private:
 
     /// Saved error string, per-thread
     ///
-    mutable thread_specific_ptr<std::string> m_errormessage;
+    static inline thread_local TGetter<std::string> m_errormessage = {};
 
     // For debugging -- keep track of who holds the tile and file mutex
 
@@ -1173,8 +1216,6 @@ private:
         } while (llstat->compare_exchange_strong(*llnewval, *lloldval));
     }
 };
-
-
 
 }  // end namespace pvt
 

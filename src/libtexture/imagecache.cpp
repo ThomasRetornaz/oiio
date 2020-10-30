@@ -35,6 +35,9 @@
 OIIO_NAMESPACE_BEGIN
 using namespace pvt;
 
+
+   //thread_local TGetter<ImageCachePerThreadInfo> ImageCacheImpl::m_perthread_info = {};
+
 namespace pvt {
 
 // The static perthread mutex needs to outlive the shared_image_cache
@@ -1570,7 +1573,7 @@ ImageCacheTile::data(int x, int y, int z, int c) const
 
 
 ImageCacheImpl::ImageCacheImpl()
-    : m_perthread_info(&cleanup_perthread_info)
+    //: m_perthread_info(&cleanup_perthread_info)
 {
     init();
 }
