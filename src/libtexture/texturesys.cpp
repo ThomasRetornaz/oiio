@@ -2915,7 +2915,7 @@ TextureSystemImpl::unit_test_texture()
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real<> dis;
+    std::uniform_real_distribution<> dis(0.,1.);
     for (int i = 0; i < 100; ++i) {
         dsdx = 1.5f * (dis(gen) - 0.5f);
         dtdx = 1.5f * (dis(gen) - 0.5f);
