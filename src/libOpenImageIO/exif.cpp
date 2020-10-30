@@ -11,7 +11,7 @@
 #include <sstream>
 #include <vector>
 
-#include <boost/container/flat_map.hpp>
+#include <map>
 
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imageio.h>
@@ -27,8 +27,9 @@ using namespace pvt;
 
 class TagMap::Impl {
 public:
-    typedef boost::container::flat_map<int, const TagInfo*> tagmap_t;
-    typedef boost::container::flat_map<std::string, const TagInfo*> namemap_t;
+    typedef std::map<int, const TagInfo*> tagmap_t;
+    typedef std::map<std::string, const TagInfo*> namemap_t;
+    
     // Name map is lower case so it's effectively case-insensitive
 
     Impl(string_view mapname, cspan<TagInfo> tag_table)

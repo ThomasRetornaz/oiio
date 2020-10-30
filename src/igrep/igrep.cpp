@@ -17,17 +17,10 @@
 #include <OpenImageIO/strutil.h>
 #include <OpenImageIO/sysutil.h>
 
-#ifdef USE_BOOST_REGEX
-#    include <boost/regex.hpp>
-using boost::regex;
-using boost::regex_search;
-using namespace boost::regex_constants;
-#else
 #    include <regex>
 using std::regex;
 using std::regex_search;
 using namespace std::regex_constants;
-#endif
 
 using namespace OIIO;
 

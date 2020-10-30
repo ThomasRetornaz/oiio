@@ -6,8 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <boost/container/flat_map.hpp>
+#include <map>
 
 #include <half.h>
 
@@ -124,8 +123,8 @@ public:
 
 
 
-typedef boost::container::flat_map<ColorProcCacheKey, ColorProcessorHandle>
-    ColorProcessorMap;
+typedef std::map<ColorProcCacheKey, ColorProcessorHandle >
+ColorProcessorMap;
 
 
 

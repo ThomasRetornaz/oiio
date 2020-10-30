@@ -3,5 +3,5 @@
 # https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
 
 fancy_add_executable (LINK_LIBRARIES OpenImageIO
-                                     ${Boost_LIBRARIES} # because regex
+                                     #${Boost_LIBRARIES} # because regex
                       )

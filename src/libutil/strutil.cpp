@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
 
-
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdarg>
 #include <cstdint>
@@ -17,8 +18,6 @@
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #    include <xlocale.h>
 #endif
-
-#include <boost/algorithm/string.hpp>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/platform.h>
@@ -411,71 +410,102 @@ wordwrap(string_view src, int columns, int prefix)
 bool
 Strutil::iequals(string_view a, string_view b)
 {
-    return boost::algorithm::iequals(a, b, std::locale::classic());
+    if (a.size() != b.size())
+        return false;
+    return std::equal(a.begin(), a.end(), b.begin(),
+                      [](char a, char b) { return tolower(a) == tolower(b); });
 }
 
 
 bool
 Strutil::iless(string_view a, string_view b)
 {
-    return boost::algorithm::ilexicographical_compare(a, b,
-                                                      std::locale::classic());
+    return std::lexicographical_compare(a.begin(), a.end(), b.begin(),b.end(),
+                      [](char a, char b) { return tolower(a) == tolower(b); });
 }
 
 
 bool
 Strutil::starts_with(string_view a, string_view b)
 {
-    return boost::algorithm::starts_with(a, b);
+    std::string aprime(a); //FIXME
+    return aprime.starts_with(b.c_str());
 }
 
 
 bool
 Strutil::istarts_with(string_view a, string_view b)
 {
-    return boost::algorithm::istarts_with(a, b, std::locale::classic());
+    auto locala=std::string(a); //FIXME
+    auto localb = std::string(b);
+    std::transform(locala.begin(), locala.end(), locala.begin(), ::tolower);
+    std::transform(localb.begin(), localb.end(), localb.begin(), ::tolower);
+    return locala.starts_with(localb);
 }
 
 
 bool
 Strutil::ends_with(string_view a, string_view b)
 {
-    return boost::algorithm::ends_with(a, b);
+    std::string aprime(a);
+    return aprime.ends_with(b.c_str());
 }
 
 
 bool
 Strutil::iends_with(string_view a, string_view b)
 {
-    return boost::algorithm::iends_with(a, b, std::locale::classic());
+    auto locala = std::string(a);  //FIXME
+    auto localb = std::string(b);
+    std::transform(locala.begin(), locala.end(), locala.begin(), ::tolower);
+    std::transform(localb.begin(), localb.end(), localb.begin(), ::tolower);
+    return locala.ends_with(localb);
 }
 
 
 bool
 Strutil::contains(string_view a, string_view b)
 {
-    return boost::algorithm::contains(a, b);
-}
+    auto locala = std::string(a); //FIXME
+    auto localb = std::string(b);  //FIXME
 
+    std::size_t found = locala.find(localb);
+    if (found != std::string::npos)
+        return true;
+    return false;
+}
 
 bool
 Strutil::icontains(string_view a, string_view b)
 {
-    return boost::algorithm::icontains(a, b, std::locale::classic());
+    auto locala = std::string(a);  //FIXME
+    auto localb = std::string(b);
+    std::transform(locala.begin(), locala.end(), locala.begin(), ::tolower);
+    std::transform(localb.begin(), localb.end(), localb.begin(), ::tolower);
+    std::size_t found=locala.find(localb);
+    if (found != std::string::npos)
+        return true;
+    return false;
 }
 
 
 void
 Strutil::to_lower(std::string& a)
 {
-    boost::algorithm::to_lower(a, std::locale::classic());
+    std::transform(a.begin(), a.end(), a.begin(),
+
+                   [](unsigned char c) { return std::tolower(c); }  // correct
+    );
 }
 
 
 void
 Strutil::to_upper(std::string& a)
 {
-    boost::algorithm::to_upper(a, std::locale::classic());
+    std::transform(a.begin(), a.end(), a.begin(),
+
+                   [](unsigned char c) { return std::toupper(c); }  // correct
+    );
 }
 
 
@@ -483,17 +513,22 @@ Strutil::to_upper(std::string& a)
 bool
 Strutil::StringIEqual::operator()(const char* a, const char* b) const noexcept
 {
-    return boost::algorithm::iequals(a, b, std::locale::classic());
+    return std::equal(
+        a, a + strlen(a), b,
+        b + strlen(b),[](char a,char b) {
+                                            return tolower(a) == tolower(b);
+                                        });
 }
 
 
 bool
 Strutil::StringILess::operator()(const char* a, const char* b) const noexcept
 {
-    return boost::algorithm::ilexicographical_compare(a, b,
-                                                      std::locale::classic());
+    return std::lexicographical_compare(a, a+strlen(a), b, b+strlen(b),
+                                        [](char a, char b) {
+                                            return tolower(a) == tolower(b);
+                                        });
 }
-
 
 
 string_view

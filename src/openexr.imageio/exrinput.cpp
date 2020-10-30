@@ -11,15 +11,6 @@
 #include <memory>
 #include <numeric>
 
-#include <boost/version.hpp>
-#if BOOST_VERSION >= 106900
-#    include <boost/integer/common_factor_rt.hpp>
-using boost::integer::gcd;
-#else
-#    include <boost/math/common_factor_rt.hpp>
-using boost::math::gcd;
-#endif
-
 #include <OpenImageIO/platform.h>
 
 #include <ImfChannelList.h>
@@ -817,7 +808,7 @@ OpenEXRInput::PartInfo::parse_header(OpenEXRInput* in,
                 r[1] = static_cast<int>(d);
                 spec.attribute(oname, TypeRational, r);
             } else if (int f = static_cast<int>(
-                                   gcd<long int>(rational[0], rational[1]))
+                                    std::gcd(rational->n, rational->d)) //FIXME
                                > 1) {
                 int r[2];
                 r[0] = n / f;

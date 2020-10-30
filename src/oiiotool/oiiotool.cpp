@@ -34,17 +34,10 @@
 
 #include "oiiotool.h"
 
-#ifdef USE_BOOST_REGEX
-#    include <boost/regex.hpp>
-using boost::match_results;
-using boost::regex;
-using boost::regex_search;
-#else
 #    include <regex>
 using std::match_results;
 using std::regex;
 using std::regex_search;
-#endif
 
 
 using namespace OIIO;

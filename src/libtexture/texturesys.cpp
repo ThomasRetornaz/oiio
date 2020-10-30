@@ -8,8 +8,7 @@
 #include <list>
 #include <sstream>
 #include <string>
-
-#include <boost/random.hpp>
+#include <random>
 
 #include <ImathMatrix.h>
 #include <half.h>
@@ -2914,13 +2913,14 @@ TextureSystemImpl::unit_test_texture()
     dtdy = 0.2;
     visualize_ellipse("6.tif", dsdx, dtdx, dsdy, dtdy, 0.0, 0.5);
 
-    boost::mt19937 rndgen;
-    boost::uniform_01<boost::mt19937, float> rnd(rndgen);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real<> dis;
     for (int i = 0; i < 100; ++i) {
-        dsdx = 1.5f * (rnd() - 0.5f);
-        dtdx = 1.5f * (rnd() - 0.5f);
-        dsdy = 1.5f * (rnd() - 0.5f);
-        dtdy = 1.5f * (rnd() - 0.5f);
+        dsdx = 1.5f * (dis(gen) - 0.5f);
+        dtdx = 1.5f * (dis(gen) - 0.5f);
+        dsdy = 1.5f * (dis(gen) - 0.5f);
+        dtdy = 1.5f * (dis(gen) - 0.5f);
         visualize_ellipse(Strutil::sprintf("%04d.tif", 100 + i), dsdx, dtdx,
                           dsdy, dtdy, sblur, tblur);
     }

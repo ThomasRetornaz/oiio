@@ -62,21 +62,6 @@
 #include <OpenImageIO/strutil.h>
 #include <OpenImageIO/sysutil.h>
 
-#include <boost/version.hpp>
-#if BOOST_VERSION >= 106500
-#    ifndef _GNU_SOURCE
-#        define _GNU_SOURCE
-#    endif
-#    include <boost/stacktrace.hpp>
-#endif
-
-// clang 7.0 (rc2) has errors when including boost thread!
-// The only thin we're using there is boost::physical_concurrency.
-#if !(OIIO_CLANG_VERSION >= 7)
-#    include <boost/thread.hpp>
-#endif
-
-
 OIIO_NAMESPACE_BEGIN
 
 using namespace Sysutil;
@@ -548,12 +533,7 @@ Sysutil::hardware_concurrency()
 unsigned int
 Sysutil::physical_concurrency()
 {
-    // clang 7.0.0rc2 has trouble compiling boost thread
-#if BOOST_VERSION >= 105600 && !(OIIO_CLANG_VERSION >= 7)
-    return boost::thread::physical_concurrency();
-#else
     return std::thread::hardware_concurrency();
-#endif
 }
 
 
@@ -601,54 +581,12 @@ aligned_free(void* ptr)
 std::string
 Sysutil::stacktrace()
 {
-#if BOOST_VERSION >= 106500
-    std::stringstream out;
-    out << boost::stacktrace::stacktrace();
-    return out.str();
-#else
     return "";
-#endif
 }
-
-
-
-#if BOOST_VERSION >= 106500
-
-static std::string stacktrace_filename;
-static std::mutex stacktrace_filename_mutex;
-
-static void
-stacktrace_signal_handler(int signum)
-{
-    ::signal(signum, SIG_DFL);
-    if (!stacktrace_filename.empty()) {
-        if (stacktrace_filename == "stdout")
-            std::cout << Sysutil::stacktrace();
-        else if (stacktrace_filename == "stderr")
-            std::cerr << Sysutil::stacktrace();
-        else {
-#    if BOOST_VERSION >= 106500
-            boost::stacktrace::safe_dump_to(stacktrace_filename.c_str());
-#    endif
-        }
-    }
-    ::raise(SIGABRT);
-}
-
-#endif
-
-
 
 bool
 Sysutil::setup_crash_stacktrace(string_view filename)
 {
-#if BOOST_VERSION >= 106500
-    std::lock_guard<std::mutex> lock(stacktrace_filename_mutex);
-    stacktrace_filename = filename;
-    ::signal(SIGSEGV, &stacktrace_signal_handler);
-    ::signal(SIGABRT, &stacktrace_signal_handler);
-    return true;
-#endif
     return false;
 }
 

@@ -1724,8 +1724,8 @@ make_texture_impl(ImageBufAlgo::MakeTextureMode mode, const ImageBuf* input,
 
     // If using update mode, stamp the output file with a modification time
     // matching that of the input file.
-    if (ok && updatemode && from_filename)
-        Filesystem::last_write_time(tmpfilename, in_time);
+   /* if (ok && updatemode && from_filename)
+        Filesystem::last_write_time(tmpfilename, in_time);*/
 
     // Since we wrote the texture to a temp file first, now we rename it to
     // the final destination.

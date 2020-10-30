@@ -8,8 +8,6 @@
 #include <iostream>
 #include <string>
 
-#include <boost/tokenizer.hpp>
-
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/platform.h>
@@ -26,32 +24,20 @@
 #    include <unistd.h>
 #endif
 
-#ifdef USE_BOOST_REGEX
-#    include <boost/regex.hpp>
-using boost::match_results;
-using boost::regex;
-using boost::regex_search;
-#else
 #    include <regex>
 using std::match_results;
 using std::regex;
 using std::regex_search;
-#endif
 
-#include <boost/filesystem.hpp>
-namespace filesystem = boost::filesystem;
-using error_code     = boost::system::error_code;
+#include <filesystem>
+namespace filesystem = std::filesystem;
+using error_code     = std::error_code;//std::filesystem::filesystem_error;
 // FIXME: use std::filesystem when available
 
 
 
 OIIO_NAMESPACE_BEGIN
 
-
-// boost internally doesn't use MultiByteToWideChar (CP_UTF8,...
-// to convert char* to wchar_t* because they do not know the encoding
-// See boost/filesystem/path.hpp
-// The only correct way to do this is to do the conversion ourselves.
 
 inline filesystem::path
 u8path(string_view name)
@@ -86,7 +72,6 @@ pathstr(const filesystem::path& p)
 
 
 #ifdef _MSC_VER
-// fix for https://svn.boost.org/trac/boost/ticket/6320
 const std::string dummy_path = "../dummy_path.txt";
 const std::string dummy_extension
     = filesystem::path(dummy_path).extension().string();
@@ -128,7 +113,14 @@ Filesystem::replace_extension(const std::string& filepath,
     return pathstr(u8path(filepath).replace_extension(new_extension));
 }
 
-
+auto
+split(const std::string& s, const std::regex& re)
+{
+    std::vector<std::string> res;
+    std::copy(std::sregex_token_iterator { begin(s), end(s), re, -1 },
+              std::sregex_token_iterator {}, std::back_inserter(res));
+    return res;
+}
 
 void
 Filesystem::searchpath_split(const std::string& searchpath,
@@ -138,10 +130,11 @@ Filesystem::searchpath_split(const std::string& searchpath,
 
     std::string path_copy = searchpath;
     std::string last_token;
-    typedef boost::tokenizer<boost::char_separator<char>> tokenizer;
+    /*typedef boost::tokenizer<boost::char_separator<char>> tokenizer;
     boost::char_separator<char> sep(":;");
-    tokenizer tokens(searchpath, sep);
-    for (tokenizer::iterator tok_iter         = tokens.begin();
+    tokenizer tokens(searchpath, sep);*/
+    auto tokens = split(searchpath, std::regex { ":|;" });
+    for (auto tok_iter = tokens.begin();
          tok_iter != tokens.end(); last_token = *tok_iter, ++tok_iter) {
         std::string path = *tok_iter;
 #ifdef _WIN32
@@ -166,12 +159,6 @@ Filesystem::searchpath_split(const std::string& searchpath,
         if (!validonly || Filesystem::is_directory(path))
             dirs.push_back(path);
     }
-#if 0
-    std::cerr << "Searchpath = '" << searchpath << "'\n";
-    for (auto& d : dirs)
-        std::cerr << "\tPath = '" << d << "'\n";
-    std::cerr << "\n";
-#endif
 }
 
 
@@ -197,7 +184,7 @@ Filesystem::searchpath_find(const std::string& filename_utf8,
         const filesystem::path d(u8path(d_utf8));
         filesystem::path f = d / filename;
         error_code ec;
-        if (filesystem::is_regular(f, ec)) {
+        if (filesystem::is_regular_file(f, ec)) {
             return pathstr(f);
         }
 
@@ -398,7 +385,7 @@ std::string
 Filesystem::unique_path(string_view model)
 {
     error_code ec;
-    filesystem::path p = filesystem::unique_path(u8path(model), ec);
+    filesystem::path p = filesystem::temp_directory_path(ec);
     return ec ? std::string() : pathstr(p);
 }
 
@@ -542,20 +529,17 @@ std::time_t
 Filesystem::last_write_time(string_view path) noexcept
 {
     error_code ec;
-    std::time_t t = filesystem::last_write_time(u8path(path), ec);
-    return ec ? 0 : t;
+    auto entry    = filesystem::directory_entry(filesystem::path(path.c_str()), ec); 
+    filesystem::file_time_type t = entry.last_write_time();
+    return ec ? 0 : t.time_since_epoch().count();
 }
 
-
-
-void
-Filesystem::last_write_time(string_view path, std::time_t time) noexcept
-{
-    error_code ec;
-    filesystem::last_write_time(u8path(path), time, ec);
-}
-
-
+//void
+//Filesystem::last_write_time(string_view path, std::time_t time) noexcept
+//{
+//    error_code ec;
+//    filesystem::last_write_time(u8path(path), time, ec);
+//}
 
 uint64_t
 Filesystem::file_size(string_view path) noexcept
@@ -875,7 +859,7 @@ Filesystem::scan_for_matching_filenames(const std::string& pattern_,
         error_code ec;
         for (filesystem::directory_iterator it(u8path(directory), ec), end_it;
              !ec && it != end_it; ++it) {
-            if (filesystem::is_regular(it->path(), ec)) {
+            if (filesystem::is_regular_file(it->path(), ec)) {
                 const std::string f = pathstr(it->path());
                 match_results<std::string::const_iterator> frame_match;
                 if (regex_match(f, frame_match, pattern_re)) {

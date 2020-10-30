@@ -63,6 +63,7 @@ option (${PROJ_NAME}_BUILD_TOOLS "Build the command-line tools" OFF)
 option (${PROJ_NAME}_BUILD_TESTS "Build the unit tests" OFF)
 set (OIIO_LIBNAME_SUFFIX "" CACHE STRING
      "Optional name appended to ${PROJECT_NAME} libraries that are built")
+option (OIIO_BUILD_UTILS "If ON, will build libOpenImageIO_Util" OFF)
 option (BUILD_OIIOUTIL_ONLY "If ON, will build *only* libOpenImageIO_Util" OFF)
 option (BUILD_DOCS "If ON, build documentation and man pages." OFF)
 option (INSTALL_DOCS "If ON, install documentation and man pages." OFF)
@@ -133,7 +134,9 @@ include_directories (
   )
 
 # Tell CMake to process the sub-directories
-add_subdirectory (src/libutil)
+if(OIIO_BUILD_UTILS)
+	add_subdirectory (src/libutil)
+endif()
 
 #find_or_download_robin_map ()
 
@@ -157,7 +160,10 @@ if ("${OIIO_SITE}" STREQUAL "SPI")
 endif ()
 if (EMBEDPLUGINS AND NOT BUILD_OIIOUTIL_ONLY)
     foreach (plugin_dir ${all_format_plugin_dirs})
-        add_subdirectory (${plugin_dir})
+        string(FIND ${plugin_dir} socket FIND_SOCKET) #TR28102020 disbale socket due to dependency on boost asio
+        if(${FIND_SOCKET} EQUAL -1)
+            add_subdirectory (${plugin_dir})
+        endif()
     endforeach ()
 endif ()
 
@@ -181,7 +187,10 @@ endif ()
 # since each plugin needs libOpenImageIO to be a dependency.
 if (NOT EMBEDPLUGINS AND NOT BUILD_OIIOUTIL_ONLY)
     foreach (plugin_dir ${all_format_plugin_dirs})
-        add_subdirectory (${plugin_dir})
+    string(FIND ${plugin_dir} socket FIND_SOCKET) #TR28102020 disbale socket due to dependency on boost asio
+        if(${FIND_SOCKET} EQUAL -1)
+            add_subdirectory (${plugin_dir})
+        endif()
     endforeach ()
 endif ()
 

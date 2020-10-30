@@ -24,18 +24,10 @@
 #    include <OpenImageIO/detail/pugixml/pugixml.hpp>
 #endif
 
-#ifdef USE_BOOST_REGEX
-#    include <boost/regex.hpp>
-using boost::regex;
-using boost::regex_match;
-using namespace boost::regex_constants;
-#else
 #    include <regex>
 using std::regex;
 using std::regex_match;
 using namespace std::regex_constants;
-#endif
-
 
 OIIO_NAMESPACE_BEGIN
 
@@ -361,17 +353,10 @@ ImageSpec::erase_attribute(string_view name, TypeDesc searchtype,
     if (extra_attribs.empty())
         return;  // Don't mess with regexp if there isn't any metadata
     try {
-#if USE_BOOST_REGEX
-        boost::regex_constants::syntax_option_type flag
-            = boost::regex_constants::basic;
-        if (!casesensitive)
-            flag |= boost::regex_constants::icase;
-#else
         std::regex_constants::syntax_option_type flag
             = std::regex_constants::basic;
         if (!casesensitive)
             flag |= std::regex_constants::icase;
-#endif
         regex re     = regex(name.str(), flag);
         auto matcher = [&](const ParamValue& p) {
             return regex_match(p.name().string(), re)

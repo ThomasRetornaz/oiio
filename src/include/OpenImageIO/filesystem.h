@@ -233,7 +233,7 @@ OIIO_API std::time_t last_write_time (string_view path) noexcept;
 
 /// Set last modified time on file
 ///
-OIIO_API void last_write_time (string_view path, std::time_t time) noexcept;
+//OIIO_API void last_write_time (string_view path, std::time_t time) noexcept;
 
 /// Return the size of the file (in bytes), or uint64_t(-1) if there is any
 /// error.

@@ -29,7 +29,7 @@ include (ExternalProject)
 
 option (BUILD_MISSING_DEPS "Try to download and build any missing dependencies" OFF)
 
-
+if(0)
 ###########################################################################
 # Boost setup
 if (LINKSTATIC)
@@ -73,7 +73,7 @@ link_directories ("${Boost_LIBRARY_DIRS}")
 
 # end Boost setup
 ###########################################################################
-
+endif()
 
 ###########################################################################
 # Dependencies for required formats and features. These are so critical

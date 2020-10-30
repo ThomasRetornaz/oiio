@@ -21,15 +21,9 @@
 #include <OpenImageIO/strutil.h>
 #include <OpenImageIO/sysutil.h>
 
-#ifdef USE_BOOST_REGEX
-#    include <boost/regex.hpp>
-using boost::regex;
-using boost::regex_search;
-#else
 #    include <regex>
 using std::regex;
 using std::regex_search;
-#endif
 
 using namespace OIIO;
 

@@ -28,17 +28,8 @@
 #include <OpenImageIO/sysutil.h>
 #include <OpenImageIO/thread.h>
 
-#include <boost/container/flat_map.hpp>
-
-#if 0
-
-// Use boost::lockfree::queue for the task queue
-#    include <boost/lockfree/queue.hpp>
-template<typename T> using Queue = boost::lockfree::queue<T>;
-
-#else
-
-#    include <queue>
+#include <map>
+#include <queue>
 
 namespace {
 
@@ -80,7 +71,7 @@ private:
 
 }  // namespace
 
-#endif
+
 
 
 OIIO_NAMESPACE_BEGIN
@@ -345,7 +336,7 @@ private:
     int m_size { 0 };           // Number of threads in the queue
     std::mutex mutex;
     std::condition_variable cv;
-    mutable boost::container::flat_map<std::thread::id, int> m_worker_threadids;
+    mutable std::map<std::thread::id, int> m_worker_threadids;
     mutable spin_mutex m_worker_threadids_mutex;
 };
 

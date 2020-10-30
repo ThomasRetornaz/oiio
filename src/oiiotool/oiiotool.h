@@ -8,8 +8,6 @@
 #include <functional>
 #include <memory>
 
-#include <boost/container/flat_set.hpp>
-
 #include <OpenImageIO/color.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/sysutil.h>
@@ -945,7 +943,8 @@ protected:
     std::vector<ImageBuf*> m_img;
     std::vector<string_view> m_args;
     ParamValueList m_options;
-    typedef boost::container::flat_set<int> FastIntSet;
+    //typedef boost::container::flat_set<int> FastIntSet;
+    typedef std::set<int> FastIntSet;
     FastIntSet subimage_includes;  // Subimages to operate on (empty == all)
     FastIntSet subimage_excludes;  // Subimages to skip for the op
     setup_func_t m_setup_func;

@@ -371,11 +371,11 @@ catalog_builtin_plugins()
 #if !defined(DISABLE_SGI)
     DECLAREPLUG (sgi);
 #endif
-#ifdef USE_BOOST_ASIO
-#if !defined(DISABLE_SOCKET)
-    DECLAREPLUG (socket);
-#endif
-#endif
+//#ifdef USE_BOOST_ASIO // #TR28102020 disbale socket due to dependency on boost asio
+//#if !defined(DISABLE_SOCKET)
+//    DECLAREPLUG (socket);
+//#endif
+//#endif
 #if !defined(DISABLE_SOFTIMAGE)
     DECLAREPLUG_RO (softimage);
 #endif
