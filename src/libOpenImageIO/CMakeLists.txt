@@ -145,7 +145,7 @@ target_link_libraries (OpenImageIO
             $<$<BOOL:${OpenColorIO_FOUND}>:OpenColorIO::OpenColorIO>
             ${BZIP2_LIBRARIES}
             ${ZLIB_LIBRARIES}
-            ${Boost_LIBRARIES}
+            #${Boost_LIBRARIES}
             ${CMAKE_DL_LIBS}
         )
 
